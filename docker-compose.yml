@@ -1,0 +1,30 @@
+# Runs the API and its own MongoDB on one machine (e.g. an Oracle Cloud free VM, or your laptop).
+#   cp .env.example .env    # fill it in
+#   docker compose up -d
+#   docker compose exec api npm run seed
+services:
+  mongo:
+    image: mongo:8
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    # Not published to the internet: only the API can reach it.
+
+  api:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      MONGODB_URI: mongodb://mongo:27017/caliphate
+      STORAGE: disk
+      UPLOAD_DIR: /app/uploads
+    volumes:
+      - uploads:/app/uploads
+    ports:
+      - "4000:4000"
+    depends_on:
+      - mongo
+
+volumes:
+  mongo-data:
+  uploads:

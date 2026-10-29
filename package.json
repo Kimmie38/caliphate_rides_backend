@@ -1,0 +1,24 @@
+{
+  "name": "caliphate-rides-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Caliphate Rides API: riders, drivers, live tracking, payments and admin (Node.js + MongoDB)",
+  "type": "module",
+  "main": "src/server.js",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "seed": "node scripts/seed.js",
+    "test": "node --test",
+    "check-contract": "node scripts/check-contract.js ../caliphate-rides"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "mongoose": "^9.11.4",
+    "multer": "^2.0.2",
+    "socket.io": "^4.8.1"
+  }
+}

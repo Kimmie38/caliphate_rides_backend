@@ -1,0 +1,39 @@
+# Render Blueprint: Render → New → Blueprint → pick this repo.
+# The database is MongoDB Atlas (free M0), not Render. Render asks for the values marked sync: false.
+# On first start the server sets itself up: fares, Sokoto places and the first admin.
+services:
+  - type: web
+    name: caliphate-api
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: npm install --omit=dev
+    startCommand: node src/server.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      - key: JWT_SECRET
+        generateValue: true
+      # From Atlas → Connect → Drivers, with /caliphate before the "?"
+      - key: MONGODB_URI
+        sync: false
+      # The first admin for the dashboard (/dashboard). Password: 10+ characters.
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      # Testing without an SMS account: sign-in codes are written to Render's Logs.
+      # When Termii is ready: SMS_PROVIDER=termii, add TERMII_API_KEY, TERMII_BASE_URL, TERMII_SENDER_ID,
+      # and delete ALLOW_CONSOLE_SMS.
+      - key: SMS_PROVIDER
+        value: console
+      - key: ALLOW_CONSOLE_SMS
+        value: "true"
+      # Document photos go into MongoDB (Render's free disk is wiped on every restart).
+      - key: STORAGE
+        value: mongo
+      # Payments: add FLW_SECRET_KEY and FLW_WEBHOOK_HASH later under Environment. Until then the app
+      # works with cash and transfer only.
