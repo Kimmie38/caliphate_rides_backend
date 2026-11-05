@@ -18,7 +18,7 @@
 import { Router } from "express";
 import { config } from "../config.js";
 import { badRequest, conflict, notFound, unauthorized } from "../lib/errors.js";
-import { DOCUMENT_KINDS, documentRequirement, drivingBlockers } from "../lib/driverRules.js";
+import { DOCUMENT_KINDS, documentRequirement, drivingBlockers, missingSections } from "../lib/driverRules.js";
 import { signToken } from "../lib/jwt.js";
 import { hashPassword, checkPassword } from "../lib/password.js";
 import { DEFAULT_PRICING, LIMITS, RIDE_TYPES } from "../lib/pricing.js";
@@ -77,6 +77,7 @@ adminRouter.get("/settings", (_req, res) => {
     placeCategories: PLACE_CATEGORIES,
     limits: LIMITS,
     paymentsReady: !!config.flutterwave.secretKey,
+    paymentsTestMode: /_TEST/i.test(config.flutterwave.secretKey),
   });
 });
 
@@ -193,6 +194,8 @@ adminRouter.get("/drivers", async (req, res) => {
       name: d.personal?.fullName ?? "",
       phone: d.user?.phone ?? "",
       vehicleType: d.vehicleType,
+      forOwner: d.vehicle?.ownsVehicle === false,
+      ownerName: d.vehicle?.ownsVehicle === false ? d.owner?.fullName ?? "" : undefined,
       plate: d.vehicle?.plate ?? "",
       status: d.status,
       online: d.online,
@@ -224,6 +227,8 @@ async function fullDriver(d) {
     trips: d.tripsCount ?? 0,
     online: d.online,
     blockers: drivingBlockers(d.toObject({ flattenMaps: true })),
+    // What's still missing from the record (e.g. documents added to the requirements after the driver applied).
+    missing: missingSections(d.toObject({ flattenMaps: true }), d.user?.phone ?? ""),
     ...applicationDTO(d),
     money: {
       balance: d.balance ?? 0,

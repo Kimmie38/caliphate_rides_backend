@@ -39,7 +39,11 @@ export function createApp() {
   const dashboard = fileURLToPath(new URL("../public/dashboard", import.meta.url));
   app.use("/dashboard", express.static(dashboard, { index: "index.html", maxAge: "10m" }));
 
-  app.get("/", (_req, res) => res.json({ name: "Caliphate Rides API", ok: true, dashboard: "/dashboard" }));
+  app.get("/", (req, res) => {
+    // admin.<your domain> points at this same server: open the admin website straight away.
+    if (/^admin\./i.test(req.hostname)) return res.redirect(302, "/dashboard/");
+    res.json({ name: "Caliphate Rides API", ok: true, dashboard: "/dashboard" });
+  });
   app.use("/", publicRouter);
   app.use("/auth", authRouter);
   app.use("/me", meRouter);

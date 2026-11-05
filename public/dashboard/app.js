@@ -92,6 +92,10 @@ function showShell() {
     main.before(h("div", { class: "notice", style: { margin: "16px 32px 0" } },
       "Flutterwave isn't connected yet (FLW_SECRET_KEY), so card payments, top-ups, bank checks and driver withdrawals are off. Cash and transfer rides work."));
   }
+  if (ctx.settings.paymentsReady && ctx.settings.paymentsTestMode) {
+    main.before(h("div", { class: "notice", style: { margin: "16px 32px 0" } },
+      "Flutterwave is in TEST mode: payments use test cards and payouts are simulated. No real money moves."));
+  }
   refreshCounts();
   countsTimer = setInterval(refreshCounts, 60_000);
   route();

@@ -5,6 +5,7 @@ import { GeoPointSchema, RatingSchema } from "./shared.js";
 const VersionSchema = new mongoose.Schema(
   {
     files: { type: [String], default: [] }, // stored file names (served through signed links)
+    variant: String, // which document it is, e.g. "Learner's permit", "International passport"
     number: String,
     expiry: String, // YYYY-MM-DD
     uploadedAt: { type: Date, default: Date.now },
@@ -63,6 +64,14 @@ const DriverSchema = new mongoose.Schema(
       fullName: { type: String, default: "" },
       phone: { type: String, default: "" },
       relationship: { type: String, default: "" },
+      address: { type: String, default: "" },
+    },
+    // Only when the driver drives someone else's vehicle (vehicle.ownsVehicle = false). Kept on the
+    // record with the owner's letter and ID, so the owner can be reached if the vehicle is stolen or misused.
+    owner: {
+      fullName: { type: String, default: "" },
+      phone: { type: String, default: "" },
+      email: { type: String, default: "" },
       address: { type: String, default: "" },
     },
     bank: {

@@ -20,6 +20,7 @@ import { requireUser } from "../middleware/auth.js";
 import { Driver, PAYMENT_METHODS, Payment, Ride } from "../models/index.js";
 import { notifyCancelled, offerNext } from "../services/matching.js";
 import { quoteTrip, rideSplit } from "../services/pricing.js";
+import { emitTo, userRoom } from "../services/realtime.js";
 import { debitWallet, markRidePaid, publishRide, rideView } from "../services/rides.js";
 import { log } from "../lib/log.js";
 
@@ -47,6 +48,13 @@ const asPlace = (p, prefix) => ({
   category: "pin",
   location: { latitude: p.latitude, longitude: p.longitude },
 });
+
+/** Tells the ride's driver that the rider changed how they'll pay. */
+async function tellDriverPayment(ride) {
+  if (!ride.driver) return;
+  const d = await Driver.findById(ride.driver, { user: 1 });
+  if (d) emitTo(userRoom(d.user), "ride:payment", { rideId: ride._id.toString(), paymentMethod: ride.paymentMethod, paymentStatus: ride.paymentStatus });
+}
 
 async function ownRide(req) {
   const ride = await Ride.findOne({ _id: req.params.id, rider: req.user._id });
@@ -165,6 +173,7 @@ ridesRouter.patch("/:id/payment", async (req, res) => {
   }
   ride.paymentMethod = paymentMethod;
   await ride.save();
+  await tellDriverPayment(ride);
   res.json({ ride: await publishRide(ride) });
 });
 
@@ -175,6 +184,7 @@ ridesRouter.post("/:id/pay", async (req, res) => {
   if (ride.paymentMethod !== "card") {
     ride.paymentMethod = "card";
     await ride.save();
+    await tellDriverPayment(ride);
   }
   const reference = `CR-RIDE-${ride._id}-${randomBytes(3).toString("hex")}`;
   await Payment.create({ reference, user: req.user._id, kind: "ride", ride: ride._id, amount: ride.fare });

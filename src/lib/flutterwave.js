@@ -10,6 +10,15 @@ const TIMEOUT_MS = 20_000;
 
 export const flutterwaveReady = () => !!config.flutterwave.secretKey;
 
+/** Test keys (FLWSECK_TEST-…): nothing is really charged or paid out. */
+export const flutterwaveTestMode = () => /_TEST/i.test(config.flutterwave.secretKey);
+
+/**
+ * In test mode Flutterwave leaves transfers "pending" forever unless the reference ends in a mock
+ * suffix. _PMCKDU_1 = "mock success after 1 minute", so test withdrawals complete like real ones.
+ */
+export const transferReference = (base) => (flutterwaveTestMode() ? `${base}_PMCKDU_1` : base);
+
 /**
  * An error from Flutterwave. `reached` is true when Flutterwave answered (so we know the request was
  * refused), false when it never answered (network trouble: the request may or may not have gone through).

@@ -82,6 +82,10 @@ driversRouter.put("/me/application", async (req, res) => {
       ownsVehicle: typeof v.ownsVehicle === "boolean" ? v.ownsVehicle : true,
     };
   }
+  if (body.owner) {
+    const o = obj(body.owner, "Vehicle owner");
+    driver.owner = { fullName: s(o.fullName, 80), phone: s(o.phone, 20), email: s(o.email, 120).toLowerCase(), address: s(o.address, 240) };
+  }
   if (body.guarantor) {
     const g = obj(body.guarantor, "Guarantor");
     driver.guarantor = { fullName: s(g.fullName, 80), phone: s(g.phone, 20), relationship: choice(g.relationship, RELATIONSHIPS), address: s(g.address, 240) };
@@ -110,7 +114,8 @@ driversRouter.post("/me/documents", documentUpload, async (req, res) => {
     if (files.length < reqs.photos) throw badRequest(reqs.photos > 1 ? "Add a photo of each side." : "Add a photo.", "missing_photos");
     const number = s(req.body.number, 40);
     const expiry = s(req.body.expiry, 10);
-    const errors = validateDocumentDetails(reqs, { number, expiry });
+    const variant = s(req.body.variant, 60);
+    const errors = validateDocumentDetails(reqs, { number, expiry, variant });
     const first = Object.values(errors)[0];
     if (first) throw badRequest(first, "invalid_document");
 
@@ -120,6 +125,7 @@ driversRouter.post("/me/documents", documentUpload, async (req, res) => {
     await storeUploads(files);
     const version = {
       files: files.map((f) => f.filename),
+      ...(reqs.variants ? { variant } : {}),
       ...(reqs.needsNumber ? { number } : {}),
       ...(reqs.needsExpiry ? { expiry } : {}),
       uploadedAt: new Date(),

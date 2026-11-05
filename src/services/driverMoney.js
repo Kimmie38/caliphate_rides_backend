@@ -10,7 +10,7 @@
 //     pays it through Flutterwave. Past the admin's limit (default ₦5,000) they can't go online until then.
 import { randomBytes } from "node:crypto";
 import { badRequest, conflict, HttpError } from "../lib/errors.js";
-import { FlutterwaveError, bankCodeFor, createTransfer, flutterwaveReady, getTransfer, resolveAccount } from "../lib/flutterwave.js";
+import { FlutterwaveError, bankCodeFor, createTransfer, flutterwaveReady, getTransfer, resolveAccount, transferReference } from "../lib/flutterwave.js";
 import { log } from "../lib/log.js";
 import { namesMatch } from "../lib/names.js";
 import { Driver, DriverLedger, Withdrawal } from "../models/index.js";
@@ -141,7 +141,7 @@ export async function requestWithdrawal(driver, amount) {
     throw conflict("You already have a withdrawal on its way. Wait for it to arrive first.", "withdrawal_in_progress");
   }
 
-  const reference = `CR-WD-${driver._id}-${randomBytes(4).toString("hex")}`;
+  const reference = transferReference(`CR-WD-${driver._id}-${randomBytes(4).toString("hex")}`);
   const w = await Withdrawal.create({
     driver: driver._id, amount, reference,
     bank: { bankName: driver.bank.bankName, bankCode: driver.bank.bankCode, accountNumber: driver.bank.accountNumber, accountName: driver.bank.verifiedName },

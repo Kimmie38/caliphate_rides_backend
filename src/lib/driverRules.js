@@ -6,14 +6,30 @@ import { normalizeNgPhone } from "./phone.js";
 export const MIN_DRIVER_AGE = 18;
 export const EXPIRY_WARNING_DAYS = 30;
 
-export const DOCUMENT_KINDS = ["licence", "selfie", "vehicle_photo", "vehicle_licence", "ownership", "insurance", "roadworthiness", "operating_permit"];
+export const DOCUMENT_KINDS = [
+  "licence", "proof_of_address", "selfie", "vehicle_photo", "vehicle_licence", "ownership", "owner_letter", "owner_id",
+  "insurance", "roadworthiness", "operating_permit",
+];
 
 export const DOCUMENTS = [
-  { kind: "licence", title: "Driver's licence", photos: 2, needsNumber: "Licence number", needsExpiry: true, required: () => true, blocksDriving: true },
+  {
+    kind: "licence", title: "Driver's licence or learner's permit", photos: 2, variants: ["Driver's licence", "Learner's permit"],
+    needsNumber: "Licence or permit number", needsExpiry: true, required: () => true, blocksDriving: true,
+  },
+  {
+    kind: "proof_of_address", title: "Proof of address", photos: 1, variants: ["Electricity bill", "Water bill", "Waste bill", "Tenancy agreement", "Other"],
+    needsExpiry: false, required: () => true, blocksDriving: false,
+  },
   { kind: "selfie", title: "Profile photo", photos: 1, needsExpiry: false, required: () => true, blocksDriving: false },
   { kind: "vehicle_photo", title: "Vehicle photo", photos: 1, needsExpiry: false, required: () => true, blocksDriving: false },
   { kind: "vehicle_licence", title: "Vehicle licence", photos: 1, needsExpiry: true, required: () => true, blocksDriving: true },
   { kind: "ownership", title: "Proof of ownership", photos: 1, needsExpiry: false, required: () => true, blocksDriving: false },
+  // Driving someone else's vehicle: the owner's signed authorisation and government ID.
+  { kind: "owner_letter", title: "Owner's letter of authorisation", photos: 1, needsExpiry: false, required: (_v, owns) => !owns, blocksDriving: false },
+  {
+    kind: "owner_id", title: "Owner's government ID", photos: 1, variants: ["NIN slip or card", "International passport", "Driver's licence", "Voter's card"],
+    needsNumber: "ID number", needsExpiry: false, required: (_v, owns) => !owns, blocksDriving: false,
+  },
   { kind: "insurance", title: "Insurance certificate", photos: 1, needsNumber: "Policy number", needsExpiry: true, required: () => true, blocksDriving: true },
   { kind: "roadworthiness", title: "Roadworthiness certificate", photos: 1, needsExpiry: true, required: (v) => v === "car", blocksDriving: true },
   { kind: "operating_permit", title: "Commercial operating permit", photos: 1, needsNumber: "Permit number", needsExpiry: true, required: () => false, blocksDriving: false },
@@ -112,6 +128,18 @@ export function validateGuarantor(g, driverPhone) {
   return e;
 }
 
+/** The vehicle owner's details, when the driver drives someone else's vehicle. */
+export function validateOwner(o, driverPhone) {
+  const e = {};
+  if (words(o.fullName) < 2) e.fullName = "Enter the owner's full name.";
+  const ph = normalizeNgPhone(o.phone ?? "");
+  if (!ph) e.phone = "Enter the owner's Nigerian mobile number.";
+  else if (driverPhone && ph === driverPhone) e.phone = "Enter the owner's own number, not yours.";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((o.email ?? "").trim())) e.email = "Enter the owner's email address.";
+  if ((o.address ?? "").trim().length < 8) e.address = "Enter the owner's house address.";
+  return e;
+}
+
 export function validateBank(b) {
   const e = {};
   if (!b.bankName) e.bankName = "Choose your bank.";
@@ -121,8 +149,9 @@ export function validateBank(b) {
 }
 
 /** Checks one document upload's details (photos are checked by the upload route). */
-export function validateDocumentDetails(req, { number, expiry }) {
+export function validateDocumentDetails(req, { number, expiry, variant }) {
   const e = {};
+  if (req.variants?.length && !req.variants.includes(variant ?? "")) e.variant = "Choose which document this is.";
   if (req.needsNumber && !(number ?? "").trim()) e.number = `Enter the ${req.needsNumber.toLowerCase()}.`;
   if (req.needsExpiry) {
     if (!isIsoDate(expiry)) e.expiry = "Enter the expiry date as DD/MM/YYYY.";
@@ -137,6 +166,7 @@ export function missingSections(app, driverPhone = "") {
   if (!app.vehicleType) missing.push("Vehicle type");
   if (Object.keys(validatePersonal(app.personal ?? {})).length) missing.push("Personal details");
   if (Object.keys(validateVehicle(app.vehicle ?? {})).length) missing.push("Vehicle details");
+  if (app.vehicle?.ownsVehicle === false && Object.keys(validateOwner(app.owner ?? {}, driverPhone)).length) missing.push("Vehicle owner");
   if (app.vehicleType) {
     for (const d of documentsFor(app.vehicleType, app.vehicle?.ownsVehicle ?? true)) {
       if (d.required(app.vehicleType, app.vehicle?.ownsVehicle ?? true) && !app.documents?.[d.kind]?.current) missing.push(d.title);

@@ -34,7 +34,8 @@ export async function render(main, params) {
     clear(results, table([
       { label: "Driver", cell: (d) => h("div", {}, h("b", {}, d.name || "No name yet"), h("div", { class: "muted small" }, d.recordId ?? "")) },
       { label: "Phone", cell: (d) => d.phone },
-      { label: "Vehicle", cell: (d) => [RIDE_TYPE_LABEL[d.vehicleType] ?? "—", d.plate ? ` · ${d.plate}` : ""].join("") },
+      { label: "Vehicle", cell: (d) => h("div", {}, [RIDE_TYPE_LABEL[d.vehicleType] ?? "—", d.plate ? ` · ${d.plate}` : ""].join(""),
+        d.forOwner ? h("div", {}, h("span", { class: "badge violet" }, `Drives for ${d.ownerName || "the owner"}`)) : null) },
       { label: "Status", cell: (d) => h("div", { class: "row", style: { gap: 6 } }, badge(d.status), d.online ? h("span", { class: "badge green" }, h("span", { class: "dot" }), "Online") : null) },
       { label: "Trips", right: true, num: true, cell: (d) => d.trips },
       { label: "Balance", right: true, num: true, cell: (d) => h("span", { class: d.balance < 0 ? "neg" : d.balance > 0 ? "pos" : "" }, naira(d.balance)) },
@@ -90,6 +91,10 @@ async function renderDriver(main, id) {
           h("p", {}, `${d.recordId} · ${d.phone} · ${RIDE_TYPE_LABEL[d.vehicleType] ?? "No vehicle type"} · ${d.trips} trips · ★ ${Number(d.rating).toFixed(1)}`)),
         h("div", { class: "row" }, reviewButtons)),
       d.reviewNote ? h("div", { class: "notice", style: { marginBottom: 16 } }, `Note to driver: ${d.reviewNote}`) : null,
+      d.missing?.length ? h("div", { class: "notice", style: { marginBottom: 16 } },
+        `Missing from this record: ${d.missing.join(", ")}.${d.status === "approved" ? " Ask the driver to add it from the Documents tab." : ""}`) : null,
+      !v.ownsVehicle ? h("div", { class: "notice", style: { marginBottom: 16, background: "var(--violet-soft)", color: "var(--violet-text)" } },
+        `This driver drives a vehicle that belongs to someone else: ${d.owner?.fullName || "owner not given"}. Check the owner's letter and ID below, and call the owner to confirm before approving.`) : null,
       d.status === "approved" && d.blockers?.length ? h("div", { class: "notice red", style: { marginBottom: 16 } },
         `Can't go online: ${d.blockers.map((x) => `${x.title} ${x.reason}`).join(", ")}.`) : null,
 
@@ -97,7 +102,10 @@ async function renderDriver(main, id) {
         h("section", { class: "card", style: { display: "grid", gap: 12 } }, h("h2", {}, "Personal"),
           kv([["Full name", p.fullName], ["Date of birth", p.dateOfBirth], ["Gender", p.gender], ["NIN", p.nin], ["Address", p.address], ["LGA", p.lga], ["Email", p.email]])),
         h("section", { class: "card", style: { display: "grid", gap: 12 } }, h("h2", {}, "Vehicle"),
-          kv([["Type", RIDE_TYPE_LABEL[d.vehicleType]], ["Make and model", [v.make, v.model].filter(Boolean).join(" ")], ["Year", v.year], ["Colour", v.colour], ["Plate", v.plate], ["Owner", v.ownsVehicle ? "The driver" : "Someone else"]])),
+          kv([["Type", RIDE_TYPE_LABEL[d.vehicleType]], ["Make and model", [v.make, v.model].filter(Boolean).join(" ")], ["Year", v.year], ["Colour", v.colour], ["Plate", v.plate], ["Owner", v.ownsVehicle ? "The driver" : "Someone else (see Vehicle owner)"]])),
+        !v.ownsVehicle ? h("section", { class: "card", style: { display: "grid", gap: 12, boxShadow: "inset 0 0 0 2px var(--violet-soft), var(--shadow)" } }, h("h2", {}, "Vehicle owner"),
+          kv([["Name", d.owner?.fullName], ["Phone", d.owner?.phone], ["Email", d.owner?.email ? h("a", { href: `mailto:${d.owner.email}` }, d.owner.email) : ""], ["Address", d.owner?.address]]),
+          h("p", { class: "muted small" }, "The owner's signed letter and government ID are under Documents.")) : null,
         h("section", { class: "card", style: { display: "grid", gap: 12 } }, h("h2", {}, "Guarantor"),
           kv([["Name", g.fullName], ["Phone", g.phone], ["Relationship", g.relationship], ["Address", g.address]])),
         bankCard(d, b, act)),
@@ -134,13 +142,21 @@ function bankCard(d, b, act) {
       } }, "Accept this name") : null));
 }
 
+const DOC_TITLES = {
+  licence: "Driver's licence or learner's permit", proof_of_address: "Proof of address", selfie: "Profile photo",
+  vehicle_photo: "Vehicle photo", vehicle_licence: "Vehicle licence", ownership: "Proof of ownership",
+  owner_letter: "Owner's letter of authorisation", owner_id: "Owner's government ID", insurance: "Insurance certificate",
+  roadworthiness: "Roadworthiness certificate", operating_permit: "Operating permit",
+};
+
 function docCard(doc, act) {
   const c = doc.current;
   if (!c) return null;
-  const title = doc.kind.replace(/_/g, " ").replace(/^./, (s) => s.toUpperCase());
+  const title = DOC_TITLES[doc.kind] ?? doc.kind.replace(/_/g, " ").replace(/^./, (s) => s.toUpperCase());
   return h("div", { class: "doc" },
     h("div", { class: "spread" }, h("b", {}, title), badge(c.status === "pending" ? "pending" : c.status === "approved" ? "approved" : "rejected")),
     h("div", { class: "thumbs" }, (c.files ?? []).map((url, i) => h("a", { href: url, target: "_blank", rel: "noopener", "aria-label": `Open photo ${i + 1}` }, h("img", { src: url, alt: `${title} photo ${i + 1}`, loading: "lazy" })))),
+    c.variant ? h("div", { class: "small" }, h("span", { class: "muted" }, "Type: "), c.variant) : null,
     c.number ? h("div", { class: "small" }, h("span", { class: "muted" }, "Number: "), c.number) : null,
     c.expiry ? h("div", { class: "small" }, h("span", { class: "muted" }, "Expires: "), c.expiry) : null,
     h("div", { class: "muted small" }, `Uploaded ${dateTime(c.uploadedAt)}${doc.history?.length ? ` · ${doc.history.length} older version${doc.history.length === 1 ? "" : "s"}` : ""}`),

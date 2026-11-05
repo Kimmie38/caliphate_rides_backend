@@ -123,6 +123,7 @@ export function walletTxDTO(t) {
 function versionDTO(v) {
   return {
     files: (v.files ?? []).map((f) => signedFileUrl(f)),
+    ...(v.variant ? { variant: v.variant } : {}),
     ...(v.number ? { number: v.number } : {}),
     ...(v.expiry ? { expiry: v.expiry } : {}),
     uploadedAt: iso(v.uploadedAt),
@@ -145,6 +146,7 @@ export function applicationDTO(d) {
     personal: { fullName: "", dateOfBirth: "", gender: "", address: "", lga: "", nin: "", email: "", ...pick(d.personal) },
     vehicle: { make: "", model: "", year: "", colour: "", plate: "", ownsVehicle: true, ...pick(d.vehicle) },
     guarantor: { fullName: "", phone: "", relationship: "", address: "", ...pick(d.guarantor) },
+    owner: { fullName: "", phone: "", email: "", address: "", ...pick(d.owner) },
     bank: bankDTO(d.bank),
     documents,
     ...(d.declaration?.signedName ? { declaration: { signedName: d.declaration.signedName, signedAt: iso(d.declaration.signedAt) } } : {}),

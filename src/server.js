@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 import { checkConfig, config } from "./config.js";
 import { log } from "./lib/log.js";
 import { createApp } from "./app.js";
+import { keepRoutingAwake } from "./lib/routing.js";
 import { initRealtime } from "./services/realtime.js";
 import { ensureDefaults } from "./services/bootstrap.js";
 import { recoverMatching } from "./services/matching.js";
@@ -17,10 +18,14 @@ async function main() {
   log.info("connected to MongoDB", { db: mongoose.connection.name });
   await ensureDefaults();
   if (config.sms.provider === "console") log.info("SMS codes are written to this log (SMS_PROVIDER=console), not sent to phones.");
+  log.info(config.flutterwave.secretKey
+    ? `Flutterwave connected (${/_TEST/i.test(config.flutterwave.secretKey) ? "TEST mode: no real money" : "LIVE"})${config.flutterwave.webhookHash ? "" : ", but FLW_WEBHOOK_HASH is missing so payments can only be confirmed when riders return to the app"}.`
+    : "Flutterwave not connected (FLW_SECRET_KEY empty): card payments, top-ups and payouts are off.");
 
   const server = createServer(createApp());
   const io = initRealtime(server);
   await recoverMatching();
+  if (config.keepRoutingAwake) keepRoutingAwake(); // our own routing server on a free plan
   // Payouts the bank hasn't confirmed yet get checked with Flutterwave every 5 minutes.
   setInterval(() => reconcileWithdrawals().catch((err) => log.error("payout check failed", { err: err.message })), 5 * 60_000).unref();
 

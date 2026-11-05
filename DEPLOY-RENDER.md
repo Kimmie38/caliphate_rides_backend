@@ -148,8 +148,8 @@ is set up.
   wake it, then try again.
 - **Every push to GitHub redeploys** automatically. Changing an environment variable restarts it.
 - **Atlas free storage is 512 MB.** Plenty for testing. Driver document photos use most of it.
-- **Map routes** use the public OSRM demo server until you deploy your own routing server; then set
-  `ROUTING_URL` to it.
+- **Map routes** use the public OSRM demo server until you deploy our routing server (the map server
+  kit's `render/README.md`); then add `ROUTING_URL` here. The API then keeps that server awake too.
 
 ## If it doesn't start
 

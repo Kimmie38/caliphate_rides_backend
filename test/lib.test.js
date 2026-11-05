@@ -135,8 +135,8 @@ test("driver rules: dates, plates, documents", () => {
   assert.deepEqual(documentsFor("keke", true).map((d) => d.kind).includes("roadworthiness"), false);
   assert.deepEqual(documentsFor("car", true).map((d) => d.kind).includes("roadworthiness"), true);
   const licence = documentRequirement("licence");
-  assert.deepEqual(Object.keys(validateDocumentDetails(licence, { number: "", expiry: isoInDays(-1) })).sort(), ["expiry", "number"]);
-  assert.deepEqual(validateDocumentDetails(licence, { number: "KAN123", expiry: isoInDays(200) }), {});
+  assert.deepEqual(Object.keys(validateDocumentDetails(licence, { number: "", expiry: isoInDays(-1) })).sort(), ["expiry", "number", "variant"]);
+  assert.deepEqual(validateDocumentDetails(licence, { number: "KAN123", expiry: isoInDays(200), variant: "Driver's licence" }), {});
 });
 
 function fullApplication(vehicleType = "keke") {
@@ -160,8 +160,27 @@ test("driver rules: what's missing before submitting", () => {
   assert.deepEqual(missingSections(app, "+2348031234567"), []);
   assert.deepEqual(missingSections(app, "+2348061234567"), ["Guarantor"]); // guarantor used the driver's own phone
   const noLicence = { ...app, documents: { ...app.documents, licence: undefined } };
-  assert.deepEqual(missingSections(noLicence), ["Driver's licence"]);
+  assert.deepEqual(missingSections(noLicence), ["Driver's licence or learner's permit"]);
   assert.deepEqual(missingSections({}).slice(0, 3), ["Vehicle type", "Personal details", "Vehicle details"]);
+});
+
+test("driver rules: driving someone else's vehicle needs the owner's details, letter and ID", () => {
+  const app = fullApplication();
+  app.vehicle.ownsVehicle = false;
+  assert.deepEqual(missingSections(app, "+2348031234567"), ["Vehicle owner", "Owner's letter of authorisation", "Owner's government ID"]);
+  app.owner = { fullName: "Sani Bello", phone: "08035550199", email: "sani@example.com", address: "7 Emir Yahaya Road, Sokoto" };
+  for (const kind of ["owner_letter", "owner_id"]) app.documents[kind] = { kind, current: { files: ["x.jpg"], status: "pending" }, history: [] };
+  assert.deepEqual(missingSections(app, "+2348031234567"), []);
+  assert.deepEqual(missingSections({ ...app, owner: { ...app.owner, phone: "08031234567" } }, "+2348031234567"), ["Vehicle owner"]); // the driver's own number
+  assert.ok(documentsFor("keke", true).every((d) => !["owner_letter", "owner_id"].includes(d.kind)));
+  assert.ok(documentsFor("keke", true).some((d) => d.kind === "proof_of_address"));
+});
+
+test("documents with a choice of type: licence or learner's permit", () => {
+  const licence = documentRequirement("licence");
+  assert.deepEqual(Object.keys(validateDocumentDetails(licence, { number: "KAN123", expiry: isoInDays(200) })), ["variant"]);
+  assert.deepEqual(validateDocumentDetails(licence, { number: "KAN123", expiry: isoInDays(200), variant: "Learner's permit" }), {});
+  assert.deepEqual(Object.keys(validateDocumentDetails(documentRequirement("owner_id"), { variant: "International passport" })), ["number"]);
 });
 
 test("driver rules: expired or unapproved documents stop driving", () => {

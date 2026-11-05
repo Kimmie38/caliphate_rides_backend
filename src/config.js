@@ -1,13 +1,12 @@
 // All settings come from environment variables (see .env.example).
-// Local .env files are loaded automatically when present; shell variables keep precedence.
+// .env.local and .env files in the project folder are loaded automatically when present
+// (.env.local first, so its values win; variables already set in the environment win over both).
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
-if (typeof process.loadEnvFile === "function") {
-  for (const name of [".env", ".env.local"]) {
-    const envFile = resolve(process.cwd(), name);
-    if (existsSync(envFile)) process.loadEnvFile(envFile);
-  }
+for (const name of [".env.local", ".env"]) {
+  const envFile = resolve(process.cwd(), name);
+  if (existsSync(envFile) && typeof process.loadEnvFile === "function") process.loadEnvFile(envFile);
 }
 
 const str = (name, fallback = "") => (process.env[name] ?? "").trim() || fallback;
@@ -50,8 +49,12 @@ export const config = {
   },
 
   routingUrl: str("ROUTING_URL", "https://router.project-osrm.org").replace(/\/$/, ""),
-  /** Pickups must be inside this box (west,south,east,north). Empty = anywhere. */
-  serviceArea: parseBox(str("SERVICE_AREA", "5.10,12.85,5.35,13.15")),
+  /** Used when ROUTING_URL can't route a trip (e.g. outside Sokoto while testing). "none" = estimate instead. */
+  routingFallbackUrl: /^none$/i.test(str("ROUTING_FALLBACK_URL")) ? "" : str("ROUTING_FALLBACK_URL", "https://router.project-osrm.org").replace(/\/$/, ""),
+  /** Ping the routing server every 10 minutes so a free-plan server doesn't fall asleep. Off for the public demo server. */
+  keepRoutingAwake: str("KEEP_ROUTING_AWAKE", "true") === "true" && !/router\.project-osrm\.org/.test(str("ROUTING_URL", "https://router.project-osrm.org")),
+  /** Pickups must be inside this box (west,south,east,north). "anywhere" = no limit (for testing elsewhere). */
+  serviceArea: /^(anywhere|none|off)$/i.test(str("SERVICE_AREA")) ? null : parseBox(str("SERVICE_AREA", "5.10,12.85,5.35,13.15")),
 
   matching: {
     radiusM: num("MATCH_RADIUS_M", 7000),
@@ -83,15 +86,17 @@ if (!config.corsOrigins.length) config.corsOrigins = isProd ? [config.publicUrl]
 export function checkConfig() {
   const problems = [];
   if (!config.jwtSecret || config.jwtSecret === "change-me-to-a-long-random-string") {
-    if (isProd) problems.push("JWT_SECRET must be set to a long random string.");
+    if (isProd) problems.push("JWT_SECRET must be set to a long random string (on Render: Environment → JWT_SECRET → Generate).");
     else config.jwtSecret = "dev-only-secret-do-not-use-in-production";
   }
   if (isProd && config.jwtSecret.length < 32) problems.push("JWT_SECRET should be at least 32 characters.");
   if (isProd && config.sms.provider === "console" && !config.sms.allowConsoleInProduction) {
     problems.push("SMS_PROVIDER is 'console': riders would never receive their sign-in codes. Set up Termii, or set ALLOW_CONSOLE_SMS=true while testing (codes then appear in the server log).");
   }
-  if (isProd && config.flutterwave.secretKey && !config.flutterwave.webhookHash) problems.push("FLW_WEBHOOK_HASH must be set so Flutterwave payments can be confirmed.");
-  if (isProd && config.corsOrigins.includes("*")) problems.push("CORS_ORIGINS should list your admin dashboard's address, not *.");
+  if (isProd && config.flutterwave.secretKey && !config.flutterwave.webhookHash) problems.push("FLW_WEBHOOK_HASH must be set (the same secret hash as in Flutterwave → Settings → Webhooks) so payments can be confirmed.");
+  if (isProd && config.corsOrigins.includes("*")) problems.push("CORS_ORIGINS is *. Delete CORS_ORIGINS (it isn't needed: the dashboard is served by the API itself).");
+  if (isProd && /localhost|127\.0\.0\.1/.test(config.publicUrl)) problems.push(`PUBLIC_URL is ${config.publicUrl}. Delete PUBLIC_URL on Render (it then uses your onrender.com address), or set it to your real https address.`);
+  if (isProd && /localhost|127\.0\.0\.1/.test(config.mongoUri)) problems.push("MONGODB_URI points at this computer (127.0.0.1). Paste your Atlas connection string (mongodb+srv://…).");
   if (!config.mongoUri.startsWith("mongodb")) problems.push("MONGODB_URI must be a MongoDB connection string (mongodb+srv://… from Atlas).");
   if (problems.length) throw new Error(`Settings need attention:\n- ${problems.join("\n- ")}`);
 }

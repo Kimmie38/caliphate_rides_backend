@@ -3,7 +3,7 @@
 //   driver:            "driver:online"    { online, vehicleType }
 //                      "driver:position"  { location: { latitude, longitude }, heading, at }
 // and what the server sends back: "ride:updated", "driver:position", "ride:request",
-// "ride:cancelled", "ride:paid", "driver:balance", "driver:withdrawal", and "driver:error" { message }
+// "ride:cancelled", "ride:paid", "ride:payment" (rider changed how they pay), "driver:balance", "driver:withdrawal", and "driver:error" { message }
 // when going online isn't allowed (not approved, expired document, owes too much commission).
 import { drivingBlockers } from "../lib/driverRules.js";
 import { log } from "../lib/log.js";

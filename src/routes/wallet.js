@@ -2,16 +2,23 @@
 //   POST /wallet/topup { amount }   -> { checkoutUrl }   (Flutterwave checkout)
 import { randomBytes } from "node:crypto";
 import { Router } from "express";
-import { createCheckout, paymentEmail } from "../lib/flutterwave.js";
+import { createCheckout, flutterwaveReady, paymentEmail } from "../lib/flutterwave.js";
 import { walletTxDTO } from "../lib/serialize.js";
 import { int } from "../lib/validate.js";
 import { requireUser } from "../middleware/auth.js";
-import { Payment, WalletTransaction } from "../models/index.js";
+import { Payment, User, WalletTransaction } from "../models/index.js";
+import { settlePayment } from "../services/payments.js";
 
 export const walletRouter = Router();
 walletRouter.use(requireUser);
 
 walletRouter.get("/", async (req, res) => {
+  // A top-up that was paid but whose webhook hasn't arrived yet (or was missed): ask Flutterwave now.
+  const waiting = await Payment.find({ user: req.user._id, kind: "topup", status: "pending", createdAt: { $gte: new Date(Date.now() - 2 * 3600_000) } }).limit(3);
+  if (waiting.length && flutterwaveReady()) {
+    await Promise.all(waiting.map((p) => settlePayment(p.reference).catch(() => null)));
+    req.user = await User.findById(req.user._id);
+  }
   const tx = await WalletTransaction.find({ user: req.user._id }).sort({ createdAt: -1 }).limit(50);
   res.json({ balance: req.user.walletBalance, transactions: tx.map(walletTxDTO) });
 });

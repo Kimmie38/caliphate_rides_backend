@@ -32,7 +32,7 @@ test/              unit tests (npm test)
      `mongodb+srv://caliphate:PASSWORD@cluster0.abcd.mongodb.net/caliphate?retryWrites=true&w=majority`
 3. In this folder:
    ```bash
-   cp .env.example .env        # or use .env.local; then paste MONGODB_URI and set ADMIN_EMAIL / ADMIN_PASSWORD
+   cp .env.example .env        # then open .env and paste MONGODB_URI, set ADMIN_EMAIL / ADMIN_PASSWORD
    npm install
    npm run dev                 # API on http://localhost:4000 (sets up fares, places and the first admin)
    ```
