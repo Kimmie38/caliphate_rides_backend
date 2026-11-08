@@ -10,6 +10,7 @@ const PAGES = [
   { path: "rides", label: "Rides", icon: "route", load: () => import("./views/rides.js") },
   { path: "riders", label: "Riders", icon: "people", load: () => import("./views/riders.js") },
   { path: "admins", label: "Admins", icon: "shield", load: () => import("./views/admins.js"), owner: true },
+  { path: "backup", label: "Backup", icon: "archive", load: () => import("./views/backup.js"), owner: true },
 ];
 
 const root = document.getElementById("root");
@@ -88,13 +89,17 @@ function showShell() {
     h("button", { class: "btn quiet icon", "aria-label": "Menu", onclick: () => side.classList.toggle("open") }, icon("menu")),
     h("b", {}, "Caliphate Rides"));
   clear(root, h("div", { class: "shell" }, side, h("div", {}, topbar, main)));
+  const pay = ctx.settings.paymentsProviderLabel || "The payment provider";
   if (!ctx.settings.paymentsReady) {
     main.before(h("div", { class: "notice", style: { margin: "16px 32px 0" } },
-      "Flutterwave isn't connected yet (FLW_SECRET_KEY), so card payments, top-ups, bank checks and driver withdrawals are off. Cash and transfer rides work."));
+      `${pay} isn't connected yet (its keys aren't in the server settings), so card payments, top-ups, bank checks and driver withdrawals are off. Cash and transfer rides work.`));
+  } else if (!ctx.settings.payoutsReady) {
+    main.before(h("div", { class: "notice", style: { margin: "16px 32px 0" } },
+      `${pay} is connected for payments, but driver withdrawals are off until MONNIFY_WALLET_ACCOUNT is set in the server settings.`));
   }
   if (ctx.settings.paymentsReady && ctx.settings.paymentsTestMode) {
     main.before(h("div", { class: "notice", style: { margin: "16px 32px 0" } },
-      "Flutterwave is in TEST mode: payments use test cards and payouts are simulated. No real money moves."));
+      `${pay} is in TEST mode: payments use test cards and payouts are simulated. No real money moves.`));
   }
   refreshCounts();
   countsTimer = setInterval(refreshCounts, 60_000);

@@ -8,7 +8,7 @@ export const LEDGER_KINDS = ["fare", "commission", "withdrawal", "withdrawal_ret
  *   commission           Caliphate Rides' share of a finished trip (every payment method)
  *   withdrawal           paid out to the driver's bank
  *   withdrawal_returned  a payout failed, so the money came back
- *   payment              the driver paid what they owed (Flutterwave)
+ *   payment              the driver paid what they owed (online checkout)
  *   adjustment           an admin correction, with a reason
  */
 const DriverLedgerSchema = new mongoose.Schema(

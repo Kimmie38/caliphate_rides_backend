@@ -15,11 +15,14 @@
 //   GET  /admin/rides?status=                      GET /admin/riders?q=   POST /admin/riders/:id/block { blocked }
 //   GET/POST /admin/places   PUT/DELETE /admin/places/:id
 //   GET /admin/admins  POST /admin/admins { email, name, password }  POST /admin/admins/:id/active { active }  (owner only)
+import { randomUUID } from "node:crypto";
 import { Router } from "express";
 import { config } from "../config.js";
 import { badRequest, conflict, notFound, unauthorized } from "../lib/errors.js";
 import { DOCUMENT_KINDS, documentRequirement, drivingBlockers, missingSections } from "../lib/driverRules.js";
-import { signToken } from "../lib/jwt.js";
+import { signToken, verifyToken } from "../lib/jwt.js";
+import { log } from "../lib/log.js";
+import { activeProvider, canCheckTransfer, payoutsReady, paymentsReady, paymentsTestMode, providerLabel } from "../lib/paymentProvider.js";
 import { hashPassword, checkPassword } from "../lib/password.js";
 import { DEFAULT_PRICING, LIMITS, RIDE_TYPES } from "../lib/pricing.js";
 import { applicationDTO, placeDTO } from "../lib/serialize.js";
@@ -32,6 +35,7 @@ import {
 import {
   checkWithdrawal, completeWithdrawal, failWithdrawal, ledgerDTO, postLedger, recomputeBalance, verifyDriverBank,
 } from "../services/driverMoney.js";
+import { backupSummary, writeBackup } from "../services/backup.js";
 import { clearPricingCache, getPricing } from "../services/pricing.js";
 import { emitTo, userRoom } from "../services/realtime.js";
 
@@ -66,6 +70,33 @@ adminRouter.post(
   },
 );
 
+// The backup download: a plain link (so the browser saves it straight to disk), opened with a
+// one-time, 5-minute ticket from POST /admin/backup/link. Owners only.
+const usedTickets = new Map();
+adminRouter.get("/backup/download", async (req, res) => {
+  const t = verifyToken(String(req.query.ticket ?? ""), config.jwtSecret);
+  if (!t || t.role !== "backup" || usedTickets.has(t.jti)) {
+    return res.status(401).type("text").send("This download link has expired. Go back to the admin website and press Download again.");
+  }
+  const admin = await Admin.findById(t.sub);
+  if (!admin?.active || admin.role !== "owner") return res.status(403).type("text").send("Only the account owner can download backups.");
+  usedTickets.set(t.jti, t.exp);
+  for (const [k, exp] of usedTickets) if (exp * 1000 < Date.now()) usedTickets.delete(k);
+
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[-:]/g, "").replace("T", "-");
+  res.setHeader("Content-Type", "application/zip");
+  res.setHeader("Content-Disposition", `attachment; filename="caliphate-backup-${stamp}${t.photos ? "" : "-data-only"}.zip"`);
+  res.setHeader("Cache-Control", "no-store");
+  res.flushHeaders();
+  try {
+    await writeBackup(res, { photos: !!t.photos, by: admin.email });
+    res.end();
+  } catch (err) {
+    log.error("backup download failed", { err: err.message });
+    res.destroy(err); // the browser shows the download as failed rather than saving a broken file
+  }
+});
+
 adminRouter.use(requireAdmin);
 
 adminRouter.get("/me", (req, res) => res.json({ admin: adminDTO(req.admin) }));
@@ -76,8 +107,11 @@ adminRouter.get("/settings", (_req, res) => {
     serviceArea: config.serviceArea,
     placeCategories: PLACE_CATEGORIES,
     limits: LIMITS,
-    paymentsReady: !!config.flutterwave.secretKey,
-    paymentsTestMode: /_TEST/i.test(config.flutterwave.secretKey),
+    paymentsReady: paymentsReady(),
+    payoutsReady: payoutsReady(),
+    paymentsTestMode: paymentsTestMode(),
+    paymentsProvider: activeProvider(),
+    paymentsProviderLabel: providerLabel(),
   });
 });
 
@@ -351,6 +385,9 @@ function adminWithdrawalDTO(w) {
     status: w.status,
     reference: w.reference,
     providerId: w.providerId,
+    provider: w.provider || "flutterwave",
+    providerLabel: providerLabel(w.provider || "flutterwave"),
+    canCheck: canCheckTransfer(w),
     bank: w.bank,
     failureReason: w.failureReason,
     resolvedBy: w.resolvedBy,
@@ -406,7 +443,7 @@ adminRouter.get("/withdrawals", async (req, res) => {
 adminRouter.post("/withdrawals/:id/check", async (req, res) => {
   const w = await Withdrawal.findById(req.params.id);
   if (!w) throw notFound("Withdrawal not found.");
-  if (!w.providerId) throw conflict("Flutterwave never gave this payout an id. Look it up by its reference in the Flutterwave dashboard, then mark it.", "no_provider_id");
+  if (!canCheckTransfer(w)) throw conflict(`${providerLabel(w.provider)} never gave this payout an id. Look it up by its reference in the ${providerLabel(w.provider)} dashboard, then mark it.`, "no_provider_id");
   await checkWithdrawal(w);
   res.json({ withdrawal: adminWithdrawalDTO(await Withdrawal.findById(w._id).populate("driver", "personal.fullName")) });
 });
@@ -523,6 +560,19 @@ adminRouter.delete("/places/:id", async (req, res) => {
 });
 
 // ---------- admins (owner only) ----------
+
+// ---------- backups ----------
+
+adminRouter.get("/backup", requireOwner, async (_req, res) => {
+  res.json(await backupSummary());
+});
+
+adminRouter.post("/backup/link", requireOwner, async (req, res) => {
+  const photos = req.body?.photos !== false;
+  const ticket = signToken({ sub: req.admin._id.toString(), role: "backup", photos, jti: randomUUID() }, config.jwtSecret, { days: 5 / 1440 });
+  log.info("backup requested", { by: req.admin.email, photos });
+  res.json({ url: `/admin/backup/download?ticket=${encodeURIComponent(ticket)}` });
+});
 
 adminRouter.get("/admins", requireOwner, async (_req, res) => {
   const admins = await Admin.find().sort({ createdAt: 1 });

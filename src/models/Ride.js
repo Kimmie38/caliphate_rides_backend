@@ -31,7 +31,7 @@ const RideSchema = new mongoose.Schema(
     paymentMethod: { type: String, enum: PAYMENT_METHODS, required: true },
     paymentStatus: { type: String, enum: ["pending", "paid"], default: "pending" },
     paidAt: Date,
-    paidVia: String, // e.g. "wallet", "flutterwave", "driver confirmed cash"
+    paidVia: String, // e.g. "wallet", "monnify", "flutterwave", "driver confirmed cash"
 
     // Matching: the driver currently being asked, and drivers who said no or didn't answer
     offer: { driver: { type: mongoose.Schema.Types.ObjectId, ref: "Driver" }, expiresAt: Date },

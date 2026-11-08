@@ -54,6 +54,8 @@ const ICONS = {
   check: "M5 12.5 10 17 19 7",
   close: "M6 6l12 12M18 6 6 18",
   search: "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-4-4",
+  download: "M12 4v11M7 10l5 5 5-5M5 20h14",
+  archive: "M3 5h18v4H3zM5 9v10h14V9M10 13h4",
 };
 
 export function icon(name) {

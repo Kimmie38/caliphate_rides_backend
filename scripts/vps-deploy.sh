@@ -24,11 +24,16 @@ docker build -t "$NAME" .
 
 echo "Starting…"
 docker rm -f "$NAME" >/dev/null 2>&1 || true
-docker run -d --name "$NAME" --restart unless-stopped \
+docker create --name "$NAME" --restart unless-stopped \
   --network "$NETWORK" \
   --env-file .env \
   -v caliphate-uploads:/app/uploads \
   "$NAME" >/dev/null
+# MongoDB on this server lives on a private network; give the API a way in before it starts.
+if docker network inspect caliphate-internal >/dev/null 2>&1; then
+  docker network connect caliphate-internal "$NAME"
+fi
+docker start "$NAME" >/dev/null
 
 echo "Waiting for it to start…"
 for i in $(seq 1 30); do

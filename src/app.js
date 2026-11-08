@@ -1,6 +1,8 @@
 // The Express app: middleware, routes and error handling. server.js adds the database and live updates.
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import express from "express";
+import { config } from "./config.js";
 import { HttpError } from "./lib/errors.js";
 import { log } from "./lib/log.js";
 import { cors, securityHeaders } from "./middleware/http.js";
@@ -38,6 +40,14 @@ export function createApp() {
   // The admin dashboard: plain HTML/JS files, no build step. Open /dashboard in a browser.
   const dashboard = fileURLToPath(new URL("../public/dashboard", import.meta.url));
   app.use("/dashboard", express.static(dashboard, { index: "index.html", maxAge: "10m" }));
+
+  // The app's map style (same colours as the app), pointed at MAP_TILES_URL. Used by the dashboard's map.
+  const mapStyle = JSON.stringify(JSON.parse(readFileSync(fileURLToPath(new URL("./data/map-style.json", import.meta.url)), "utf8")))
+    .replace("{{TILES_URL}}", config.map.tilesUrl)
+    .replace("{{GLYPHS_URL}}", config.map.glyphsUrl);
+  app.get("/map-style.json", (req, res) => {
+    res.set("Cache-Control", "public, max-age=600").type("application/json").send(mapStyle);
+  });
 
   app.get("/", (req, res) => {
     // admin.<your domain> points at this same server: open the admin website straight away.

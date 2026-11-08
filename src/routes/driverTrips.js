@@ -6,18 +6,18 @@
 //   GET  /driver/earnings                     -> { trips }
 // Money (also for suspended drivers, so they can still get what they earned):
 //   GET  /driver/wallet                       -> { balance, owed, blocked, settings, bank, ledger, withdrawals }
-//   POST /driver/withdrawals { amount }       -> { withdrawal, balance }   (Flutterwave transfer to their bank)
-//   POST /driver/wallet/pay  { amount? }      -> { checkoutUrl }           (pay commission owed, Flutterwave)
+//   POST /driver/withdrawals { amount }       -> { withdrawal, balance }   (payout to their bank: Monnify / Flutterwave)
+//   POST /driver/wallet/pay  { amount? }      -> { checkoutUrl }           (pay commission owed: checkout page)
 //   POST /driver/bank/verify                  -> { bank }                  (check the account with the bank again)
 import { randomBytes } from "node:crypto";
 import { Router } from "express";
 import { badRequest, conflict, notFound } from "../lib/errors.js";
-import { createCheckout, paymentEmail } from "../lib/flutterwave.js";
 import { earningsDTO, rideRequestDTO } from "../lib/serialize.js";
 import { requireApprovedDriver, requireDriver, requireUser } from "../middleware/auth.js";
 import { int } from "../lib/validate.js";
-import { Driver, DriverLedger, Payment, Ride, User, Withdrawal } from "../models/index.js";
+import { Driver, DriverLedger, Ride, User, Withdrawal } from "../models/index.js";
 import { ledgerDTO, payoutBlocker, requestWithdrawal, verifyDriverBank, withdrawalDTO } from "../services/driverMoney.js";
+import { startCheckout } from "../services/payments.js";
 import { getPricing } from "../services/pricing.js";
 import { acceptOffer, onDriverAvailable, passOn } from "../services/matching.js";
 import { advanceRide, markRidePaid, rideView } from "../services/rides.js";
@@ -85,11 +85,9 @@ driverTripsRouter.post("/wallet/pay", async (req, res) => {
   const amount = req.body?.amount === undefined ? owed : int(req.body.amount, "Amount", { min: 100, max: owed });
   const user = req.user;
   const reference = `CR-DRP-${req.driver._id}-${randomBytes(4).toString("hex")}`;
-  await Payment.create({ reference, user: user._id, kind: "driver_payment", driver: req.driver._id, amount });
-  const { checkoutUrl } = await createCheckout({
-    reference,
-    amountNaira: amount,
-    customer: { email: paymentEmail(user), name: req.driver.personal?.fullName || user.name, phone: user.phone },
+  const { checkoutUrl } = await startCheckout({
+    payment: { reference, user: user._id, kind: "driver_payment", driver: req.driver._id, amount },
+    customer: { user, name: req.driver.personal?.fullName || user.name },
     description: "Commission payment",
     meta: { kind: "driver_payment", driverId: req.driver._id.toString() },
   });

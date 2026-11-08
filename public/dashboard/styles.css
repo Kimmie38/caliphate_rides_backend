@@ -62,10 +62,11 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
 .page-head p { color: var(--muted); margin-top: 4px; }
 .topbar { display: none; }
+.main:focus { outline: none; } /* focused after each page change (for screen readers), no visible frame */
 
 @media (max-width: 860px) {
   .shell { grid-template-columns: minmax(0, 1fr); }
-  .shell .notice { margin: 12px 16px 0 !important; }
+  .shell > div > .notice { margin: 12px 16px 0 !important; } /* the banners above each page */
   .side { position: fixed; inset: 0 auto 0 0; width: 260px; z-index: 30; transform: translateX(-100%); transition: transform .2s; box-shadow: var(--shadow); }
   .side.open { transform: none; }
   .topbar { display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: var(--paper); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 20; }

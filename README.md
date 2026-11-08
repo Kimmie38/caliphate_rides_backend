@@ -1,7 +1,7 @@
 # Caliphate Rides: backend
 
 The server behind the Caliphate Rides app: sign-in by SMS code, fares, finding a driver, live
-tracking, payments (cash, transfer, wallet, card through Flutterwave), commission and driver payouts,
+tracking, payments (cash, transfer, wallet, card through Monnify or Flutterwave), commission and driver payouts,
 driver sign-up with an official record, and the web admin dashboard (served by this same server at
 `/dashboard`).
 
@@ -15,7 +15,7 @@ src/
   routes/          the API, one file per area (auth, rides, wallet, drivers, driver trips, admin…)
   services/        rides, matching, live updates, payments, pricing
   models/          MongoDB collections
-  lib/             small helpers (fares, phone numbers, tokens, driver rules, Flutterwave, SMS…)
+  lib/             small helpers (fares, phone numbers, tokens, driver rules, Monnify, Flutterwave, SMS…)
 public/dashboard/  the admin website (plain HTML/JS, no build step)
 scripts/seed.js    optional: the same first-time setup the server does on start
 test/              unit tests (npm test)
@@ -91,7 +91,7 @@ tier, or for a few dollars a month elsewhere.
 ```bash
 # on the server, with Docker installed
 git clone <your repo> caliphate-backend && cd caliphate-backend
-cp .env.example .env          # NODE_ENV=production, PUBLIC_URL, JWT_SECRET, Termii, Flutterwave…
+cp .env.example .env          # NODE_ENV=production, PUBLIC_URL, JWT_SECRET, Termii, Monnify…
 docker compose up -d          # API + MongoDB
 # the server sets up fares, places and the first admin on its first start
 ```
@@ -116,7 +116,13 @@ With `NODE_ENV=production` the server refuses to start unless:
 
 For app-store reviewers, `TEST_PHONE` and `TEST_CODE` give one fixed login that needs no SMS.
 
-## 5. Payments and payouts (Flutterwave)
+## 5. Payments and payouts (Monnify or Flutterwave)
+
+`PAYMENT_PROVIDER` picks the provider for new payments and payouts: `monnify` or `flutterwave`
+(empty: Monnify when `MONNIFY_API_KEY` is set). **Monnify setup: see [MONNIFY.md](MONNIFY.md).**
+Everything below is for Flutterwave; Monnify works the same way through `/payments/monnify/webhook`
+and `/payments/monnify/return`.
+
 
 1. Sign up at [flutterwave.com](https://flutterwave.com) and finish the business verification (KYC).
    Live payments and, especially, payouts to drivers' banks only work on a fully approved account.
@@ -234,3 +240,11 @@ Errors come back as `{ "code": "...", "message": "..." }`, with a message the ap
 ```bash
 npm test
 ```
+
+## Backups
+
+The admin website's **Backup** page (owner only) downloads one ZIP with every record (JSON lines and
+CSV spreadsheets) and every driver document photo. `node scripts/backup-export.js file.zip` makes the
+same file from the command line, and `node scripts/backup-restore.js file.zip --yes` puts it back
+(replacing the database's contents). On the VPS: `scripts/vps-full-backup.sh` and `scripts/vps-restore.sh`.
+See DEPLOY-VPS.md → "Backups and moving".

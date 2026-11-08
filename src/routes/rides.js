@@ -6,19 +6,19 @@
 //   POST  /rides/:id/cancel   { reason? }                                       -> { ride }
 //   POST  /rides/:id/rate     { stars, comment? }                               -> { ok }
 //   PATCH /rides/:id/payment  { paymentMethod }                                 -> { ride }
-//   POST  /rides/:id/pay                                                        -> { checkoutUrl }   (card, Flutterwave)
+//   POST  /rides/:id/pay                                                        -> { checkoutUrl }   (card: checkout page)
 import { randomBytes } from "node:crypto";
 import { Router } from "express";
 import { config } from "../config.js";
 import { HttpError, badRequest, conflict, notFound } from "../lib/errors.js";
 import { haversineKm } from "../lib/geo.js";
-import { createCheckout, paymentEmail } from "../lib/flutterwave.js";
 import { RIDE_TYPES } from "../lib/pricing.js";
 import { tripSummaryDTO } from "../lib/serialize.js";
 import { int, obj, oneOf, point, text } from "../lib/validate.js";
 import { requireUser } from "../middleware/auth.js";
-import { Driver, PAYMENT_METHODS, Payment, Ride } from "../models/index.js";
+import { Driver, PAYMENT_METHODS, Ride } from "../models/index.js";
 import { notifyCancelled, offerNext } from "../services/matching.js";
+import { startCheckout } from "../services/payments.js";
 import { quoteTrip, rideSplit } from "../services/pricing.js";
 import { emitTo, userRoom } from "../services/realtime.js";
 import { debitWallet, markRidePaid, publishRide, rideView } from "../services/rides.js";
@@ -187,11 +187,9 @@ ridesRouter.post("/:id/pay", async (req, res) => {
     await tellDriverPayment(ride);
   }
   const reference = `CR-RIDE-${ride._id}-${randomBytes(3).toString("hex")}`;
-  await Payment.create({ reference, user: req.user._id, kind: "ride", ride: ride._id, amount: ride.fare });
-  const { checkoutUrl } = await createCheckout({
-    reference,
-    amountNaira: ride.fare,
-    customer: { email: paymentEmail(req.user), name: req.user.name, phone: req.user.phone },
+  const { checkoutUrl } = await startCheckout({
+    payment: { reference, user: req.user._id, kind: "ride", ride: ride._id, amount: ride.fare },
+    customer: { user: req.user, name: req.user.name },
     description: `Trip to ${ride.destination.name}`,
     meta: { kind: "ride", rideId: ride._id.toString() },
   });

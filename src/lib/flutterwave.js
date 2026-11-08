@@ -2,7 +2,8 @@
 // bank account checks and payouts to drivers. Amounts are in naira.
 import { timingSafeEqual } from "node:crypto";
 import { config } from "../config.js";
-import { HttpError } from "./errors.js";
+import { findBankCode } from "./banks.js";
+import { HttpError, PaymentProviderError } from "./errors.js";
 import { log } from "./log.js";
 
 const BASE = "https://api.flutterwave.com/v3";
@@ -19,17 +20,8 @@ export const flutterwaveTestMode = () => /_TEST/i.test(config.flutterwave.secret
  */
 export const transferReference = (base) => (flutterwaveTestMode() ? `${base}_PMCKDU_1` : base);
 
-/**
- * An error from Flutterwave. `reached` is true when Flutterwave answered (so we know the request was
- * refused), false when it never answered (network trouble: the request may or may not have gone through).
- */
-export class FlutterwaveError extends HttpError {
-  constructor(message, { reached, providerMessage }) {
-    super(502, message, "payment_provider_error");
-    this.reached = reached;
-    this.providerMessage = providerMessage;
-  }
-}
+/** Errors are PaymentProviderError (see errors.js); the old name still works. */
+export { PaymentProviderError as FlutterwaveError };
 
 async function call(path, { method = "GET", body } = {}) {
   if (!flutterwaveReady()) throw new HttpError(503, "Online payments aren't set up yet. Pay with cash or transfer for now.", "payments_unavailable");
@@ -43,13 +35,13 @@ async function call(path, { method = "GET", body } = {}) {
     });
   } catch (err) {
     log.error("flutterwave unreachable", { path, err: err.message });
-    throw new FlutterwaveError("The payment service didn't respond. Try again in a moment.", { reached: false });
+    throw new PaymentProviderError("The payment service didn't respond. Try again in a moment.", { reached: false });
   }
   const json = await res.json().catch(() => null);
   if (!res.ok || json?.status !== "success") {
     const providerMessage = json?.message ?? `HTTP ${res.status}`;
     log.error("flutterwave refused", { path, status: res.status, message: providerMessage });
-    throw new FlutterwaveError("The payment service couldn't do that. Try again in a moment.", { reached: true, providerMessage });
+    throw new PaymentProviderError("The payment service couldn't do that. Try again in a moment.", { reached: true, providerMessage });
   }
   return json.data;
 }
@@ -104,16 +96,6 @@ export const paymentEmail = (user) => user.email || `${user.phone.replace(/\D/g,
 
 // ---------- bank accounts ----------
 
-// Bank codes (CBN) for the banks drivers can choose in the app. Digital banks' codes differ between
-// providers, so those are looked up from Flutterwave's own list.
-const KNOWN_CODES = {
-  "Access Bank": "044", Ecobank: "050", "Fidelity Bank": "070", "First Bank": "011", FCMB: "214",
-  "Globus Bank": "00103", GTBank: "058", "Jaiz Bank": "301", "Keystone Bank": "082", "Polaris Bank": "076",
-  "Providus Bank": "101", "Stanbic IBTC": "221", "Sterling Bank": "232", "TAJBank": "302", "Union Bank": "032",
-  UBA: "033", "Unity Bank": "215", "Wema Bank": "035", "Zenith Bank": "057",
-};
-const LOOKUP_NAMES = { Kuda: ["kuda"], Moniepoint: ["moniepoint"], OPay: ["opay", "paycom"], PalmPay: ["palmpay"] };
-
 let bankList = null;
 let bankListAt = 0;
 
@@ -127,11 +109,7 @@ export async function listBanks() {
 
 /** The bank code for a bank name from the app's list, or null if it can't be found. */
 export async function bankCodeFor(bankName) {
-  if (KNOWN_CODES[bankName]) return KNOWN_CODES[bankName];
-  const words = LOOKUP_NAMES[bankName] ?? [bankName.toLowerCase()];
-  const banks = await listBanks();
-  const match = banks.find((b) => words.some((w) => b.name.toLowerCase().includes(w)));
-  return match?.code ?? null;
+  return findBankCode(bankName, await listBanks().catch(() => []));
 }
 
 /** The name the bank has on an account. */

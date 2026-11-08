@@ -211,3 +211,28 @@ test("serializers: shapes the app expects", () => {
   const trip = tripSummaryDTO({ _id: "r1", pickup: { name: "A" }, destination: { name: "B" }, rideType: "keke", fare: 1500, distanceKm: 3, paymentMethod: "cash", completedAt: new Date("2026-10-02T09:00:00Z"), createdAt: new Date() }, "Musa");
   assert.equal(trip.fare, 1500);
 });
+
+// ---------- payment providers ----------
+import { createHmac } from "node:crypto";
+import { findBankCode } from "../src/lib/banks.js";
+
+test("bank codes: CBN code when the provider lists it, otherwise found by name", () => {
+  const monnify = [{ name: "Guaranty Trust Bank", code: "058" }, { name: "Kuda Microfinance Bank", code: "50211" }, { name: "Globus Bank", code: "103" }];
+  assert.equal(findBankCode("GTBank", monnify), "058");
+  assert.equal(findBankCode("Kuda", monnify), "50211");
+  assert.equal(findBankCode("Globus Bank", monnify), "103");
+  assert.equal(findBankCode("Zenith Bank", []), "057"); // list unavailable: CBN code
+  assert.equal(findBankCode("Moniepoint", []), null);
+});
+
+test("Monnify webhook signature: HMAC-SHA512 of the raw body (or SHA-512 of secret + body)", async () => {
+  process.env.MONNIFY_SECRET_KEY = "unit-secret";
+  process.env.MONNIFY_API_KEY = "MK_PROD_UNIT";
+  const { config } = await import("../src/config.js");
+  Object.assign(config.monnify, { secretKey: "unit-secret", apiKey: "MK_PROD_UNIT" });
+  const { validWebhookSignature } = await import("../src/lib/monnify.js");
+  const body = Buffer.from('{"eventType":"SUCCESSFUL_TRANSACTION"}');
+  assert.equal(validWebhookSignature(body, createHmac("sha512", "unit-secret").update(body).digest("hex")), true);
+  assert.equal(validWebhookSignature(body, "0".repeat(128)), false);
+  assert.equal(validWebhookSignature(body, undefined), false); // live: a signature is required
+});

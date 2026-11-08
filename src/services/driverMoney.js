@@ -7,10 +7,13 @@
 //     when the payment is confirmed. Net: the driver gets fare − commission, which they can withdraw.
 //   - Cash and transfer trips are paid straight to the driver, so only the commission comes off, and the
 //     balance can go below zero (the driver owes). It's cleared by later card/wallet trips, or the driver
-//     pays it through Flutterwave. Past the admin's limit (default ₦5,000) they can't go online until then.
+//     pays it online (Monnify / Flutterwave checkout). Past the admin's limit (default ₦5,000) they can't go online until then.
 import { randomBytes } from "node:crypto";
 import { badRequest, conflict, HttpError } from "../lib/errors.js";
-import { FlutterwaveError, bankCodeFor, createTransfer, flutterwaveReady, getTransfer, resolveAccount, transferReference } from "../lib/flutterwave.js";
+import { PaymentProviderError } from "../lib/errors.js";
+import {
+  activeProvider, bankCodeFor, canCheckTransfer, createTransfer, getTransfer, paymentsReady, payoutsReady, providerLabel, resolveAccount, transferReference,
+} from "../lib/paymentProvider.js";
 import { log } from "../lib/log.js";
 import { namesMatch } from "../lib/names.js";
 import { Driver, DriverLedger, Withdrawal } from "../models/index.js";
@@ -90,15 +93,18 @@ export const owedMessage = (owed) => `You owe ${naira(owed)} in commission. Pay 
 
 // ---------- bank account check ----------
 
-/** Asks the bank (through Flutterwave) whose account this is, and whether it matches the driver. */
+/**
+ * Asks the bank (through the payment provider) whose account this is, and whether it matches the driver.
+ * An admin's earlier approval of a non-matching name is kept when the bank gives the same name again.
+ */
 export async function verifyDriverBank(driver) {
   const bank = driver.bank ?? {};
-  const reset = { "bank.verifiedName": undefined, "bank.verifiedAt": undefined, "bank.nameMatches": undefined, "bank.approvedBy": undefined, "bank.bankCode": undefined };
+  const reset = { "bank.verifiedName": 1, "bank.verifiedAt": 1, "bank.nameMatches": 1, "bank.approvedBy": 1, "bank.bankCode": 1, "bank.codeFrom": 1 };
   if (!bank.bankName || !/^\d{10}$/.test(bank.accountNumber ?? "")) {
     await Driver.updateOne({ _id: driver._id }, { $set: { "bank.verifyError": "Add your bank account first." }, $unset: reset });
     return Driver.findById(driver._id);
   }
-  if (!flutterwaveReady()) {
+  if (!paymentsReady()) {
     await Driver.updateOne({ _id: driver._id }, { $set: { "bank.verifyError": "Bank checks aren't set up yet." } });
     return Driver.findById(driver._id);
   }
@@ -107,12 +113,16 @@ export async function verifyDriverBank(driver) {
     if (!code) throw new Error("no code");
     const name = await resolveAccount(bank.accountNumber, code);
     const matches = namesMatch(name, driver.personal?.fullName || bank.accountName);
+    const keepApproval = !!bank.approvedBy && bank.verifiedName === name;
     await Driver.updateOne(
       { _id: driver._id },
-      { $set: { "bank.bankCode": code, "bank.verifiedName": name, "bank.verifiedAt": new Date(), "bank.nameMatches": matches }, $unset: { "bank.verifyError": 1, "bank.approvedBy": 1 } },
+      {
+        $set: { "bank.bankCode": code, "bank.codeFrom": activeProvider(), "bank.verifiedName": name, "bank.verifiedAt": new Date(), "bank.nameMatches": matches },
+        $unset: { "bank.verifyError": 1, ...(keepApproval ? {} : { "bank.approvedBy": 1 }) },
+      },
     );
   } catch (err) {
-    const message = err instanceof FlutterwaveError && err.reached
+    const message = err instanceof PaymentProviderError && err.reached
       ? "The bank couldn't find this account. Check the account number and bank."
       : err.message === "no code" ? "We couldn't find this bank. Contact driver support." : "We couldn't check the account right now. Try again later.";
     await Driver.updateOne({ _id: driver._id }, { $set: { "bank.verifyError": message }, $unset: reset });
@@ -131,7 +141,9 @@ export function payoutBlocker(driver) {
 // ---------- withdrawals ----------
 
 export async function requestWithdrawal(driver, amount) {
-  if (!flutterwaveReady()) throw new HttpError(503, "Withdrawals aren't set up yet. Contact driver support.", "payouts_unavailable");
+  if (!payoutsReady()) throw new HttpError(503, "Withdrawals aren't set up yet. Contact driver support.", "payouts_unavailable");
+  // Bank codes for digital banks differ between providers: re-check accounts checked with the other one.
+  if (driver.bank?.verifiedAt && (driver.bank.codeFrom ?? "flutterwave") !== activeProvider()) driver = await verifyDriverBank(driver);
   const pricing = await getPricing();
   if (!Number.isInteger(amount) || amount < pricing.minWithdrawal) throw badRequest(`You can withdraw ${naira(pricing.minWithdrawal)} or more.`, "below_minimum");
   if (amount > 1_000_000) throw badRequest("You can withdraw up to ₦1,000,000 at a time.", "above_maximum");
@@ -142,8 +154,9 @@ export async function requestWithdrawal(driver, amount) {
   }
 
   const reference = transferReference(`CR-WD-${driver._id}-${randomBytes(4).toString("hex")}`);
+  const provider = activeProvider();
   const w = await Withdrawal.create({
-    driver: driver._id, amount, reference,
+    driver: driver._id, amount, reference, provider,
     bank: { bankName: driver.bank.bankName, bankCode: driver.bank.bankCode, accountNumber: driver.bank.accountNumber, accountName: driver.bank.verifiedName },
   });
   const debit = await postLedger(driver._id, -amount, {
@@ -156,16 +169,17 @@ export async function requestWithdrawal(driver, amount) {
   }
 
   try {
-    const t = await createTransfer({ bankCode: w.bank.bankCode, accountNumber: w.bank.accountNumber, amount, reference, narration: "Caliphate Rides earnings" });
-    await Withdrawal.updateOne({ _id: w._id }, { providerId: t.id, fee: t.fee });
-    if (t.status === "FAILED") await failWithdrawal(w._id, t.message || "The bank refused the transfer.");
-    else if (t.status === "SUCCESSFUL") await completeWithdrawal(w._id);
+    const t = await createTransfer({
+      bankCode: w.bank.bankCode, accountNumber: w.bank.accountNumber, accountName: w.bank.accountName, amount, reference, narration: "Caliphate Rides earnings",
+    });
+    await Withdrawal.updateOne({ _id: w._id }, { ...(t.id ? { providerId: t.id } : {}), ...(t.fee ? { fee: t.fee } : {}) });
+    await applyTransferStatus(w._id, t);
   } catch (err) {
-    if (err instanceof FlutterwaveError && err.reached) {
-      await failWithdrawal(w._id, err.providerMessage || "Flutterwave refused the transfer.");
+    if (err instanceof PaymentProviderError && err.reached) {
+      await failWithdrawal(w._id, err.providerMessage || `${providerLabel(provider)} refused the transfer.`);
     } else {
-      // We don't know if Flutterwave got it. Don't return the money or retry automatically: an admin checks.
-      await Withdrawal.updateOne({ _id: w._id }, { status: "needs_check", failureReason: "No answer from Flutterwave" });
+      // We don't know if the provider got it. Don't return the money or retry automatically: an admin checks.
+      await Withdrawal.updateOne({ _id: w._id }, { status: "needs_check", failureReason: `No answer from ${providerLabel(provider)}` });
       log.error("withdrawal needs checking", { withdrawal: w._id.toString(), err: err.message });
     }
   }
@@ -203,27 +217,43 @@ async function notifyWithdrawal(w) {
   if (d) emitTo(userRoom(d.user), "driver:withdrawal", withdrawalDTO(w));
 }
 
-/** Checks a payout with Flutterwave and applies the result. */
-export async function checkWithdrawal(w) {
-  if (!w.providerId || !["processing", "needs_check"].includes(w.status)) return w;
-  const t = await getTransfer(w.providerId);
-  await Withdrawal.updateOne({ _id: w._id }, { checkedAt: new Date(), ...(t.fee ? { fee: t.fee } : {}) });
-  if (t.status === "SUCCESSFUL") return completeWithdrawal(w._id);
-  if (t.status === "FAILED") return failWithdrawal(w._id, t.message || "The bank refused the transfer.");
-  return w;
+/**
+ * Applies a provider's answer about a payout. NEEDS_OTP: Monnify is holding it for a one-time code
+ * (Monnify hasn't turned OTP off for API transfers yet); an admin authorises it in the Monnify dashboard.
+ */
+async function applyTransferStatus(withdrawalId, t) {
+  if (t.status === "SUCCESSFUL") return completeWithdrawal(withdrawalId);
+  if (t.status === "FAILED") return failWithdrawal(withdrawalId, t.message || "The bank refused the transfer.");
+  if (t.status === "NEEDS_OTP") {
+    await Withdrawal.updateOne({ _id: withdrawalId, status: { $in: ["processing", "needs_check"] } }, {
+      status: "needs_check",
+      failureReason: "Monnify is waiting for an OTP. Approve it in the Monnify dashboard (Disbursements), and ask Monnify to turn off OTP for API transfers.",
+    });
+    log.error("payout waiting for OTP", { withdrawal: withdrawalId.toString() });
+  }
+  return Withdrawal.findById(withdrawalId);
 }
 
-/** Flutterwave webhook for a payout. */
+/** Checks a payout with the provider that sent it and applies the result. */
+export async function checkWithdrawal(w) {
+  if (!["processing", "needs_check"].includes(w.status) || !canCheckTransfer(w)) return w;
+  const t = await getTransfer(w.provider || "flutterwave", { id: w.providerId, reference: w.reference });
+  await Withdrawal.updateOne({ _id: w._id }, { checkedAt: new Date(), ...(t.fee ? { fee: t.fee } : {}), ...(t.id && !w.providerId ? { providerId: t.id } : {}) });
+  if (t.status === "PENDING") return w;
+  return applyTransferStatus(w._id, t);
+}
+
+/** A provider webhook about a payout. */
 export async function onTransferWebhook(reference) {
   const w = await Withdrawal.findOne({ reference });
-  if (w) await checkWithdrawal(w); // re-checked with Flutterwave, never trusted from the webhook alone
+  if (w) await checkWithdrawal(w); // re-checked with the provider, never trusted from the webhook alone
 }
 
 /** Runs every few minutes: payouts that have been on their way for a while get checked. */
 export async function reconcileWithdrawals() {
-  if (!flutterwaveReady()) return;
-  const stale = await Withdrawal.find({ status: "processing", providerId: { $exists: true }, updatedAt: { $lt: new Date(Date.now() - 10 * 60_000) } }).limit(50);
+  const stale = await Withdrawal.find({ status: "processing", updatedAt: { $lt: new Date(Date.now() - 10 * 60_000) } }).limit(50);
   for (const w of stale) {
+    if (!payoutsReady(w.provider || "flutterwave") && !paymentsReady(w.provider || "flutterwave")) continue;
     try { await checkWithdrawal(w); } catch (err) { log.error("withdrawal check failed", { withdrawal: w._id.toString(), err: err.message }); }
   }
 }

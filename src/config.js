@@ -1,13 +1,10 @@
 // All settings come from environment variables (see .env.example).
-// .env.local and .env files in the project folder are loaded automatically when present
-// (.env.local first, so its values win; variables already set in the environment win over both).
+// A .env file in the project folder is loaded automatically when present.
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
-for (const name of [".env.local", ".env"]) {
-  const envFile = resolve(process.cwd(), name);
-  if (existsSync(envFile) && typeof process.loadEnvFile === "function") process.loadEnvFile(envFile);
-}
+const envFile = resolve(process.cwd(), ".env");
+if (existsSync(envFile) && typeof process.loadEnvFile === "function") process.loadEnvFile(envFile);
 
 const str = (name, fallback = "") => (process.env[name] ?? "").trim() || fallback;
 const num = (name, fallback) => {
@@ -40,6 +37,26 @@ export const config = {
   },
   testLogin: { phone: str("TEST_PHONE"), code: str("TEST_CODE") },
 
+  /**
+   * Which provider takes new payments and sends payouts: "monnify" or "flutterwave".
+   * Left empty: Monnify when its keys are set, otherwise Flutterwave.
+   */
+  paymentProvider: (() => {
+    const v = str("PAYMENT_PROVIDER").toLowerCase();
+    if (v === "monnify" || v === "flutterwave") return v;
+    return str("MONNIFY_API_KEY") ? "monnify" : "flutterwave";
+  })(),
+
+  monnify: {
+    apiKey: str("MONNIFY_API_KEY"),
+    secretKey: str("MONNIFY_SECRET_KEY"),
+    contractCode: str("MONNIFY_CONTRACT_CODE"),
+    /** The Monnify wallet account number payouts are sent from (Monnify dashboard → Wallet). */
+    walletAccount: str("MONNIFY_WALLET_ACCOUNT"),
+    /** Optional: normally worked out from the key (MK_TEST_ → sandbox, otherwise live). */
+    baseUrl: str("MONNIFY_BASE_URL").replace(/\/$/, ""),
+  },
+
   flutterwave: {
     secretKey: str("FLW_SECRET_KEY"),
     /** The "secret hash" you set under Settings → Webhooks; Flutterwave sends it back with each webhook. */
@@ -66,10 +83,16 @@ export const config = {
   /** Where document photos are kept: "mongo" (inside the database) or "disk" (UPLOAD_DIR). */
   storage: str("STORAGE", "mongo") === "disk" ? "disk" : "mongo",
 
+  /** The map (vector tiles + label fonts). Our own Sokoto tile server, or OpenFreeMap until it's running. */
+  map: {
+    tilesUrl: str("MAP_TILES_URL", "https://tiles.openfreemap.org/planet").replace(/\/$/, ""),
+    glyphsUrl: str("MAP_GLYPHS_URL", "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf"),
+  },
+
   admin: {
     email: str("ADMIN_EMAIL"), password: str("ADMIN_PASSWORD"), name: str("ADMIN_NAME", "Caliphate Admin"),
-    /** Map style for the dashboard's place editor (MapLibre style JSON). Use your own map server before launch. */
-    mapStyleUrl: str("ADMIN_MAP_STYLE_URL", "https://tiles.openfreemap.org/styles/liberty"),
+    /** Map style for the dashboard's place editor. Default: the app's own style, drawn from MAP_TILES_URL. */
+    mapStyleUrl: str("ADMIN_MAP_STYLE_URL", "/map-style.json"),
   },
 };
 
@@ -93,7 +116,10 @@ export function checkConfig() {
   if (isProd && config.sms.provider === "console" && !config.sms.allowConsoleInProduction) {
     problems.push("SMS_PROVIDER is 'console': riders would never receive their sign-in codes. Set up Termii, or set ALLOW_CONSOLE_SMS=true while testing (codes then appear in the server log).");
   }
-  if (isProd && config.flutterwave.secretKey && !config.flutterwave.webhookHash) problems.push("FLW_WEBHOOK_HASH must be set (the same secret hash as in Flutterwave → Settings → Webhooks) so payments can be confirmed.");
+  if (config.paymentProvider === "monnify" && config.monnify.apiKey && (!config.monnify.secretKey || !config.monnify.contractCode)) {
+    problems.push("Monnify needs all three: MONNIFY_API_KEY, MONNIFY_SECRET_KEY and MONNIFY_CONTRACT_CODE (Monnify dashboard → Developers).");
+  }
+  if (config.paymentProvider === "flutterwave" && isProd && config.flutterwave.secretKey && !config.flutterwave.webhookHash) problems.push("FLW_WEBHOOK_HASH must be set (the same secret hash as in Flutterwave → Settings → Webhooks) so payments can be confirmed.");
   if (isProd && config.corsOrigins.includes("*")) problems.push("CORS_ORIGINS is *. Delete CORS_ORIGINS (it isn't needed: the dashboard is served by the API itself).");
   if (isProd && /localhost|127\.0\.0\.1/.test(config.publicUrl)) problems.push(`PUBLIC_URL is ${config.publicUrl}. Delete PUBLIC_URL on Render (it then uses your onrender.com address), or set it to your real https address.`);
   if (isProd && /localhost|127\.0\.0\.1/.test(config.mongoUri)) problems.push("MONGODB_URI points at this computer (127.0.0.1). Paste your Atlas connection string (mongodb+srv://…).");

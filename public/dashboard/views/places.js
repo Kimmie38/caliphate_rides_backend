@@ -33,7 +33,7 @@ export async function render(main, _params, ctx) {
   const map = window.maplibregl
     ? new window.maplibregl.Map({
       container: mapEl,
-      style: ctx.settings.mapStyleUrl,
+      style: new URL(ctx.settings.mapStyleUrl, location.href).href,
       bounds: [[area.west, area.south], [area.east, area.north]],
       fitBoundsOptions: { padding: 20 },
       attributionControl: { compact: true },

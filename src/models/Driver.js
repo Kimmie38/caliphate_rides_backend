@@ -78,8 +78,9 @@ const DriverSchema = new mongoose.Schema(
       bankName: { type: String, default: "" },
       accountNumber: { type: String, default: "" },
       accountName: { type: String, default: "" },
-      // Checked with the bank through Flutterwave before any payout
+      // Checked with the bank through the payment provider before any payout
       bankCode: String,
+      codeFrom: String, // which provider bankCode belongs to ("monnify" / "flutterwave")
       verifiedName: String, // the name the bank has on the account
       verifiedAt: Date,
       nameMatches: Boolean, // the bank's name matches the driver's
