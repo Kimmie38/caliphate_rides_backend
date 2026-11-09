@@ -186,6 +186,31 @@ If it shows `It didn't start` and some log lines instead, send them to Claude.
 
 ---
 
+## Demo accounts (for presentations)
+
+Two ready accounts that sign in with a fixed code, and pretend payments so card, top-up and withdrawal all work before a payment gateway is live.
+
+1. In `.env` (`nano /opt/caliphate_rides_backend/.env`), add or change these lines:
+
+   ```
+   DEMO_LOGINS=08000000001:123456,08000000002:123456
+   PAYMENT_PROVIDER=demo
+   ```
+
+2. Redeploy: `./scripts/vps-deploy.sh`
+3. Create the accounts: `docker exec caliphate-api node scripts/demo-accounts.js`
+
+| | Phone | Code | What's ready |
+|---|---|---|---|
+| Rider | 0800 000 0001 | 123456 | Aisha Bello, ₦20,000 in the wallet, 3 past trips |
+| Driver | 0800 000 0002 | 123456 | Abubakar Sani Musa, approved keke, money to withdraw |
+
+Run step 3 again to put both accounts back to how they started (for example just before the demo).
+
+With `PAYMENT_PROVIDER=demo`, paying by card or topping up opens a page marked "Demo payment · no real money" with a Pay button, and withdrawals are marked paid straight away. **No money moves.**
+
+**After the demo:** remove `DEMO_LOGINS`, set `PAYMENT_PROVIDER=monnify` (or flutterwave), redeploy, then `docker exec caliphate-api node scripts/demo-accounts.js --remove`. Anyone who knows a demo number and its code can sign in to it, so don't leave them on with real users.
+
 ## Updating later
 
 After uploading new code to GitHub:

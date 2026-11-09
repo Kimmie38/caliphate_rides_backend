@@ -236,3 +236,12 @@ test("Monnify webhook signature: HMAC-SHA512 of the raw body (or SHA-512 of secr
   assert.equal(validWebhookSignature(body, "0".repeat(128)), false);
   assert.equal(validWebhookSignature(body, undefined), false); // live: a signature is required
 });
+
+test("demo payments: payouts succeed at once and the bank name is echoed back", async () => {
+  const demo = await import("../src/lib/demoPay.js");
+  assert.equal((await demo.createTransfer({ reference: "R1", amount: 1000 })).status, "SUCCESSFUL");
+  assert.equal((await demo.getTransfer({ reference: "R1" })).status, "SUCCESSFUL");
+  assert.equal(await demo.resolveAccount("0123456789", "000", "Abubakar Sani Musa"), "ABUBAKAR SANI MUSA");
+  const { checkoutUrl } = await demo.createCheckout({ reference: "CR-TOP-1", amountNaira: 500 });
+  assert.match(checkoutUrl, /\/payments\/demo\/checkout\?ref=CR-TOP-1$/);
+});

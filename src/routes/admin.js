@@ -8,7 +8,7 @@
 //   POST /admin/drivers/:id/review                 { action: approve|request_changes|reject|suspend|reinstate, note? }
 //   POST /admin/drivers/:id/documents/:kind/review { action: approve|reject, note? }
 //   POST /admin/drivers/:id/bank/verify            POST /admin/drivers/:id/bank/approve { note }
-//   POST /admin/drivers/:id/adjust                 { amount, reason }   (+ gives the driver money, − takes it)
+//   POST /admin/drivers/:id/adjust                 { amount, reason }   (added to the balance: + gives the driver money, e.g. commission they paid in person; − takes it)
 //   POST /admin/drivers/:id/recompute
 //   GET  /admin/finance                            GET /admin/withdrawals?status=
 //   POST /admin/withdrawals/:id/check              POST /admin/withdrawals/:id/resolve { outcome: successful|failed, note }

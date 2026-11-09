@@ -28,11 +28,11 @@ FILE="atlas-$(date +%F-%H%M).archive.gz"
 mkdir -p "$DIR"
 
 echo "Copying from Atlas…"
-docker run --rm --network "$NET" -v "$DIR":/backup mongo:8 \
+docker run --rm --user 0:0 --network "$NET" -v "$DIR":/backup mongo:8 \
   mongodump --uri "$ATLAS_URI" --db "$SRC_DB" --archive="/backup/$FILE" --gzip
 
 echo "Loading into this server's MongoDB…"
-docker run --rm --network "$NET" -v "$DIR":/backup mongo:8 \
+docker run --rm --user 0:0 --network "$NET" -v "$DIR":/backup mongo:8 \
   mongorestore --uri "mongodb://$MONGO_USER:$MONGO_PASSWORD@$NAME:27017/?authSource=admin" \
   --archive="/backup/$FILE" --gzip --drop \
   --nsInclude "$SRC_DB.*" --nsFrom "$SRC_DB.*" --nsTo "caliphate.*"

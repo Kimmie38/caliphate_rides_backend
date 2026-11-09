@@ -36,14 +36,20 @@ export const config = {
     termiiChannel: str("TERMII_CHANNEL", "dnd"),
   },
   testLogin: { phone: str("TEST_PHONE"), code: str("TEST_CODE") },
+  /**
+   * Fixed sign-in codes for demo accounts, so a presentation doesn't depend on SMS:
+   * DEMO_LOGINS=08000000001:123456,08000000002:123456  (phone:code, comma separated). Remove after the demo.
+   */
+  demoLogins: str("DEMO_LOGINS").split(",").map((pair) => pair.split(":").map((x) => x.trim())).filter(([p, c]) => p && /^\d{6}$/.test(c ?? "")),
 
   /**
-   * Which provider takes new payments and sends payouts: "monnify" or "flutterwave".
+   * Which provider takes new payments and sends payouts: "monnify", "flutterwave", or "demo"
+   * (a pretend payment page and instant payouts, so the app can be shown before a gateway is live).
    * Left empty: Monnify when its keys are set, otherwise Flutterwave.
    */
   paymentProvider: (() => {
     const v = str("PAYMENT_PROVIDER").toLowerCase();
-    if (v === "monnify" || v === "flutterwave") return v;
+    if (v === "monnify" || v === "flutterwave" || v === "demo") return v; // demo: no real money, for presentations
     return str("MONNIFY_API_KEY") ? "monnify" : "flutterwave";
   })(),
 

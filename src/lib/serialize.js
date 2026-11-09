@@ -8,7 +8,7 @@ const plainMap = (m) => (m instanceof Map ? Object.fromEntries(m) : m ?? {});
 const round1 = (n) => Math.round((n ?? 0) * 10) / 10;
 
 export function userDTO(u) {
-  return { id: id(u), phone: u.phone, name: u.name ?? "", rating: round1(u.rating?.avg ?? 5) };
+  return { id: id(u), phone: u.phone, name: u.name ?? "", email: u.email ?? "", language: u.language === "ha" ? "ha" : "en", rating: round1(u.rating?.avg ?? 5), memberSince: u.createdAt };
 }
 
 export function placeDTO(p) {

@@ -19,6 +19,8 @@ async function main() {
   log.info("connected to MongoDB", { db: mongoose.connection.name });
   await ensureDefaults();
   if (config.sms.provider === "console") log.info("SMS codes are written to this log (SMS_PROVIDER=console), not sent to phones.");
+  if (activeProvider() === "demo") log.info("PAYMENT_PROVIDER=demo: card payments, top-ups and payouts are pretend (no real money). Switch to monnify before real riders use the app.");
+  if (config.demoLogins.length) log.info(`DEMO_LOGINS: ${config.demoLogins.length} demo number(s) sign in with a fixed code. Remove DEMO_LOGINS after the demo.`);
   const pay = providerLabel();
   if (!paymentsReady()) log.info(`${pay} not connected (its keys are empty): card payments, top-ups and payouts are off.`);
   else {

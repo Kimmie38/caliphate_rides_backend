@@ -178,7 +178,7 @@ function moneySection(d, m, act) {
           const btn = e.currentTarget;
           const values = await dialog({
             title: "Correct the balance",
-            message: "Use a positive amount to give the driver money (e.g. a refund) and a negative amount to take it (e.g. commission collected in person). The driver sees the reason.",
+            message: "The amount is added to the driver's balance. Positive adds money (a refund, or commission the driver paid you in person, which lowers what they owe). Negative takes money (a charge that wasn't recorded). The driver sees the reason.",
             fields: [{ name: "amount", label: "Amount (₦)", type: "number", required: true, placeholder: "e.g. 500 or -500" }, { name: "reason", label: "Reason", required: true }],
             confirm: "Apply",
           });

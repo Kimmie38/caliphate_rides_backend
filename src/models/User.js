@@ -8,6 +8,7 @@ const UserSchema = new mongoose.Schema(
     name: { type: String, default: "", trim: true, maxlength: 80 },
     email: { type: String, default: "", trim: true, lowercase: true, maxlength: 120 },
     rating: { type: RatingSchema, default: () => ({}) }, // drivers rate riders
+    language: { type: String, enum: ["en", "ha"], default: "en" }, // the app's language (English or Hausa)
     walletBalance: { type: Number, default: 0, min: 0 }, // naira
     blocked: { type: Boolean, default: false },
     lastSeenAt: Date,

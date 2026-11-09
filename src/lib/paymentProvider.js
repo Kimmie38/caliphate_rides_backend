@@ -1,4 +1,4 @@
-// One door to whichever payment provider is switched on (PAYMENT_PROVIDER = monnify or flutterwave).
+// One door to whichever payment provider is switched on (PAYMENT_PROVIDER = monnify, flutterwave or demo).
 // New payments and payouts use the active provider; ones already started are checked with the
 // provider that started them (stored on the Payment / Withdrawal), so switching is safe at any time.
 //
@@ -8,6 +8,7 @@
 import { config } from "../config.js";
 import * as flw from "./flutterwave.js";
 import * as mnf from "./monnify.js";
+import * as demo from "./demoPay.js";
 
 const flutterwaveStatus = (s) => (s === "SUCCESSFUL" || s === "FAILED" ? s : "PENDING"); // NEW / PENDING → PENDING
 
@@ -41,6 +42,20 @@ const PROVIDERS = {
     getTransfer: mnf.getTransfer,
     canCheckTransfer: () => true, // by our reference
   },
+  demo: {
+    label: "Demo (no real money)",
+    ready: demo.demoReady,
+    payoutsReady: demo.demoReady,
+    testMode: demo.demoTestMode,
+    createCheckout: demo.createCheckout,
+    verifyTransaction: demo.verifyTransaction,
+    bankCodeFor: demo.bankCodeFor,
+    resolveAccount: demo.resolveAccount,
+    transferReference: (base) => base,
+    createTransfer: demo.createTransfer,
+    getTransfer: demo.getTransfer,
+    canCheckTransfer: () => true,
+  },
 };
 
 export const PROVIDER_NAMES = Object.keys(PROVIDERS);
@@ -62,7 +77,8 @@ export async function createCheckout(args) {
 export const verifyTransaction = (provider, args) => p(provider).verifyTransaction(args);
 
 export const bankCodeFor = (bankName) => p().bankCodeFor(bankName);
-export const resolveAccount = (accountNumber, bankCode) => p().resolveAccount(accountNumber, bankCode);
+/** The account name the bank has. `expectedName` is only used by the demo provider, which echoes it back. */
+export const resolveAccount = (accountNumber, bankCode, expectedName) => p().resolveAccount(accountNumber, bankCode, expectedName);
 
 export const transferReference = (base) => p().transferReference(base);
 export const createTransfer = (args) => p().createTransfer(args);

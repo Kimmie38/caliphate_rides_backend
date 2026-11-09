@@ -18,6 +18,13 @@ export const authRouter = Router();
 
 const perIp = rateLimit({ windowMs: 10 * 60 * 1000, max: 30, message: "Too many sign-in attempts from this network. Try again in a few minutes." });
 
+/** The fixed code for a test or demo number (TEST_PHONE / DEMO_LOGINS), or null for everyone else. */
+function fixedCode(phone) {
+  if (config.testLogin.phone && config.testLogin.code && normalizeNgPhone(config.testLogin.phone) === phone) return config.testLogin.code;
+  const demo = config.demoLogins.find(([p]) => normalizeNgPhone(p) === phone);
+  return demo ? demo[1] : null;
+}
+
 const phoneFrom = (body) => {
   const phone = normalizeNgPhone(obj(body).phone);
   if (!phone) throw badRequest("Enter a Nigerian mobile number, like 803 214 5567.", "invalid_phone");
@@ -26,7 +33,8 @@ const phoneFrom = (body) => {
 
 authRouter.post("/otp/request", perIp, async (req, res) => {
   const phone = phoneFrom(req.body);
-  const isTest = config.testLogin.phone && phone === config.testLogin.phone && config.testLogin.code;
+  const fixed = fixedCode(phone);
+  const isTest = !!fixed;
 
   const recent = await OtpCode.find({ phone, createdAt: { $gte: new Date(Date.now() - 60 * 60 * 1000) } }).sort({ createdAt: -1 });
   if (!isTest && recent[0] && Date.now() - recent[0].createdAt.getTime() < OTP_RESEND_MS) {
@@ -35,7 +43,7 @@ authRouter.post("/otp/request", perIp, async (req, res) => {
   }
   if (!isTest && recent.length >= OTP_MAX_PER_HOUR) throw tooMany("Too many codes requested for this number. Try again in an hour.", "otp_limit");
 
-  const code = isTest ? config.testLogin.code : newCode();
+  const code = fixed ?? newCode();
   await OtpCode.create({ phone, codeHash: hashCode(phone, code, config.jwtSecret), expiresAt: new Date(Date.now() + OTP_TTL_MS) });
   if (!isTest) {
     try {

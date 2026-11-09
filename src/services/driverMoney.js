@@ -111,7 +111,7 @@ export async function verifyDriverBank(driver) {
   try {
     const code = await bankCodeFor(bank.bankName);
     if (!code) throw new Error("no code");
-    const name = await resolveAccount(bank.accountNumber, code);
+    const name = await resolveAccount(bank.accountNumber, code, driver.personal?.fullName || bank.accountName);
     const matches = namesMatch(name, driver.personal?.fullName || bank.accountName);
     const keepApproval = !!bank.approvedBy && bank.verifiedName === name;
     await Driver.updateOne(
