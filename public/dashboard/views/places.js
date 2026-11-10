@@ -5,13 +5,29 @@ import { CATEGORY, api, attempt, clear, dialog, h, icon, toast } from "../lib.js
 
 export async function render(main, _params, ctx) {
   const { places } = await api("/places");
-  const area = ctx.settings.serviceArea ?? { west: 5.1, south: 12.85, east: 5.35, north: 13.15 };
+  // The cities we work in. The map opens on the last one used here; the buttons above the map switch.
+  const cities = ctx.settings.cities?.length ? ctx.settings.cities : [{ id: "sokoto", name: "Sokoto", box: { west: 5.1, south: 12.85, east: 5.35, north: 13.15 } }];
+  let saved = null;
+  try { saved = localStorage.getItem("cr.placesCity"); } catch {}
+  let city = cities.find((c) => c.id === saved) ?? cities[0];
+  let area = city.box;
 
   let selected = null; // { place?, marker, isNew }
   let filter = "";
   const markers = new Map(); // dbId -> maplibre Marker
 
-  const mapEl = h("div", { id: "map", role: "application", "aria-label": "Map of Sokoto. Click to add a place." });
+  const mapEl = h("div", { id: "map", role: "application", "aria-label": "Map. Click to add a place." });
+  const cityBar = h("div", { class: "city-bar", role: "tablist", "aria-label": "City" });
+  const drawCities = () => clear(cityBar, ...cities.map((c) => h("button", {
+    class: `city-chip${c.id === city.id ? " on" : ""}`, role: "tab", "aria-selected": String(c.id === city.id),
+    onclick: () => {
+      city = c; area = c.box;
+      try { localStorage.setItem("cr.placesCity", c.id); } catch {}
+      drawCities();
+      map?.fitBounds([[area.west, area.south], [area.east, area.north]], { padding: 20, duration: 800 });
+    },
+  }, c.name)));
+  drawCities();
   const results = h("div", { class: "map-results hidden" });
   const searchInput = h("input", { class: "input", type: "search", placeholder: "Find a street or area on the map…", "aria-label": "Find on the map" });
   const panel = h("div", { class: "card", style: { display: "grid", gap: 12 } });
@@ -22,6 +38,7 @@ export async function render(main, _params, ctx) {
   clear(main,
     h("div", { class: "page-head" },
       h("div", {}, h("h1", {}, "Map places"), h("p", {}, "Click the map to add a place it doesn't have. Places you add appear in the app's search and on its map within a few minutes."))),
+    cityBar,
     h("div", { class: "places-layout" },
       h("div", { class: "map-box" }, mapEl,
         h("div", { class: "map-hint" }, h("div", { class: "map-search" }, searchInput, results), h("span", { class: "pill" }, "Click the map to drop a pin"))),

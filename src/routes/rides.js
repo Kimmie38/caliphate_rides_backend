@@ -7,6 +7,7 @@
 //   POST  /rides/:id/rate     { stars, comment? }                               -> { ok }
 //   PATCH /rides/:id/payment  { paymentMethod }                                 -> { ride }
 //   POST  /rides/:id/pay                                                        -> { checkoutUrl }   (card: checkout page)
+import { cityList, inAreas } from "../data/cities.js";
 import { randomBytes } from "node:crypto";
 import { Router } from "express";
 import { config } from "../config.js";
@@ -15,7 +16,7 @@ import { haversineKm } from "../lib/geo.js";
 import { RIDE_TYPES } from "../lib/pricing.js";
 import { tripSummaryDTO } from "../lib/serialize.js";
 import { int, obj, oneOf, point, text } from "../lib/validate.js";
-import { requireUser } from "../middleware/auth.js";
+import { requirePhone, requireUser } from "../middleware/auth.js";
 import { Driver, PAYMENT_METHODS, Ride } from "../models/index.js";
 import { notifyCancelled, offerNext } from "../services/matching.js";
 import { startCheckout } from "../services/payments.js";
@@ -35,9 +36,8 @@ function tripPoints(body) {
   const pickup = point(b.pickup, "Pickup");
   const destination = point(b.destination, "Destination");
   if (haversineKm(pickup, destination) < 0.15) throw badRequest("Your pickup and destination are the same place. Choose a different destination.", "same_place");
-  const a = config.serviceArea;
-  if (a && !(pickup.latitude >= a.south && pickup.latitude <= a.north && pickup.longitude >= a.west && pickup.longitude <= a.east)) {
-    throw badRequest("Caliphate Rides isn't available here yet. Pickups need to be in Sokoto.", "outside_service_area");
+  if (!inAreas(pickup, config.serviceAreas)) {
+    throw badRequest(`Caliphate Rides isn't available here yet. Pickups need to be in ${cityList(config.serviceAreas ?? undefined)}.`, "outside_service_area");
   }
   return { pickup, destination };
 }
@@ -68,7 +68,7 @@ ridesRouter.post("/quote", async (req, res) => {
   res.json({ quotes });
 });
 
-ridesRouter.post("/", async (req, res) => {
+ridesRouter.post("/", requirePhone, async (req, res) => {
   const { pickup, destination } = tripPoints(req.body);
   const rideType = oneOf(req.body.rideType, "Ride type", RIDE_TYPES);
   const paymentMethod = oneOf(req.body.paymentMethod, "Payment method", PAYMENT_METHODS);

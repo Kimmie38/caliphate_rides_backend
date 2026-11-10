@@ -1,22 +1,74 @@
-// Phone sign-in with a 6-digit code by SMS.
-//   POST /auth/otp/request { phone }        -> { expiresIn }
-//   POST /auth/otp/verify  { phone, code }  -> { token, user, isNewUser }
+// Signing in. Three ways in, all ending with { token, user, isNewUser }:
+//   GET  /auth/methods                          -> { whatsapp, email, sms, whatsappNumber }  which ones are switched on
+//   WhatsApp (free): the app shows a code, the person sends it to our WhatsApp number, the app checks.
+//     POST /auth/whatsapp/start                 -> { checkId, secret, code, link, number, message, expiresIn }
+//     POST /auth/whatsapp/check { checkId, secret } -> { status: "pending" } | { status: "confirmed", token, user, isNewUser }
+//   Email (free): a 6-digit code by email.
+//     POST /auth/email/request { email, lang? } -> { expiresIn }
+//     POST /auth/email/verify  { email, code }  -> { token, user, isNewUser }
+//   Phone code by SMS (Termii, paid), and the demo numbers in DEMO_LOGINS:
+//     POST /auth/otp/request { phone }          -> { expiresIn }
+//     POST /auth/otp/verify  { phone, code }    -> { token, user, isNewUser }
 import { Router } from "express";
 import { config } from "../config.js";
 import { badRequest, tooMany } from "../lib/errors.js";
-import { signToken } from "../lib/jwt.js";
 import { log } from "../lib/log.js";
 import { OTP_MAX_ATTEMPTS, OTP_MAX_PER_HOUR, OTP_RESEND_MS, OTP_TTL_MS, codeMatches, hashCode, newCode } from "../lib/otp.js";
 import { normalizeNgPhone } from "../lib/phone.js";
-import { userDTO } from "../lib/serialize.js";
 import { sendSms } from "../lib/sms.js";
 import { obj } from "../lib/validate.js";
 import { rateLimit } from "../middleware/http.js";
 import { OtpCode, User } from "../models/index.js";
+import { whatsappReady } from "../lib/whatsapp.js";
+import { checkEmailCode, emailFrom, sendEmailCode, sessionFor, startWhatsAppCheck, takeWhatsAppCheck } from "../services/signin.js";
 
 export const authRouter = Router();
 
 const perIp = rateLimit({ windowMs: 10 * 60 * 1000, max: 30, message: "Too many sign-in attempts from this network. Try again in a few minutes." });
+// The app asks every 2 seconds while the person is in WhatsApp, so checks get their own, higher limit.
+const checks = rateLimit({ windowMs: 10 * 60 * 1000, max: 600, message: "Too many checks. Try again in a few minutes." });
+
+authRouter.get("/methods", (req, res) => {
+  res.json({
+    whatsapp: whatsappReady(),
+    whatsappNumber: whatsappReady() ? config.whatsapp.number : "",
+    email: config.email.provider !== "console" || config.env !== "production",
+    sms: config.sms.provider === "termii",
+  });
+});
+
+authRouter.post("/whatsapp/start", perIp, async (req, res) => {
+  if (!whatsappReady()) throw badRequest("WhatsApp sign-in isn't switched on yet. Use email instead.", "whatsapp_off");
+  res.json(await startWhatsAppCheck("signin"));
+});
+
+authRouter.post("/whatsapp/check", checks, async (req, res) => {
+  const r = await takeWhatsAppCheck(req.body, "signin");
+  if (r.status === "pending") return res.json(r);
+  let user = await User.findOne({ phone: r.phone });
+  const isNewUser = !user;
+  if (!user) {
+    try { user = await User.create({ phone: r.phone }); }
+    catch (err) { if (err?.code === 11000) user = await User.findOne({ phone: r.phone }); else throw err; }
+  }
+  res.json({ status: "confirmed", ...(await sessionFor(user, isNewUser)) });
+});
+
+authRouter.post("/email/request", perIp, async (req, res) => {
+  res.json(await sendEmailCode(emailFrom(req.body), req.body?.lang));
+});
+
+authRouter.post("/email/verify", perIp, async (req, res) => {
+  const email = emailFrom(req.body);
+  await checkEmailCode(email, req.body?.code);
+  let user = await User.findOne({ signInEmail: email });
+  const isNewUser = !user;
+  if (!user) {
+    try { user = await User.create({ signInEmail: email, email }); }
+    catch (err) { if (err?.code === 11000) user = await User.findOne({ signInEmail: email }); else throw err; }
+  }
+  res.json(await sessionFor(user, isNewUser));
+});
 
 /** The fixed code for a test or demo number (TEST_PHONE / DEMO_LOGINS), or null for everyone else. */
 function fixedCode(phone) {
@@ -74,9 +126,5 @@ authRouter.post("/otp/verify", perIp, async (req, res) => {
   let user = await User.findOne({ phone });
   const isNewUser = !user;
   if (!user) user = await User.create({ phone });
-  if (user.blocked) throw badRequest("This account is on hold. Call Caliphate Rides support.", "account_blocked");
-  await User.updateOne({ _id: user._id }, { lastSeenAt: new Date() });
-
-  const token = signToken({ sub: user._id.toString(), role: "user" }, config.jwtSecret, { days: config.jwtDays });
-  res.json({ token, user: userDTO(user), isNewUser });
+  res.json(await sessionFor(user, isNewUser));
 });

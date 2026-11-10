@@ -211,3 +211,9 @@ td.right, th.right { text-align: right; }
   .savebar { bottom: 8px; }
   .places-layout .map-box { height: 55vh; }
 }
+
+/* City switch above the Map places map */
+.city-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.city-chip { border: 1px solid var(--line); background: var(--paper); color: var(--ink); border-radius: 999px; padding: 8px 16px; font: inherit; font-weight: 700; font-size: 14px; cursor: pointer; }
+.city-chip:hover { border-color: var(--green); }
+.city-chip.on { background: var(--green); border-color: var(--green); color: var(--green-ink); }

@@ -3,7 +3,7 @@ import { api, attempt, clear, date, dialog, h, naira, table, toast } from "../li
 export async function render(main) {
   let q = "";
   const results = h("div");
-  const search = h("input", { class: "input search", type: "search", placeholder: "Name or phone number", "aria-label": "Search riders" });
+  const search = h("input", { class: "input search", type: "search", placeholder: "Name, phone or email", "aria-label": "Search riders" });
   let t;
   search.addEventListener("input", () => { clearTimeout(t); t = setTimeout(() => { q = search.value.trim(); load(); }, 250); });
 
@@ -11,7 +11,7 @@ export async function render(main) {
     const { riders } = await api(`/riders${q ? `?q=${encodeURIComponent(q)}` : ""}`);
     clear(results, table([
       { label: "Rider", cell: (u) => h("b", {}, u.name || "No name yet") },
-      { label: "Phone", cell: (u) => u.phone },
+      { label: "Phone or email", cell: (u) => u.phone || u.email || "–" },
       { label: "Wallet", right: true, num: true, cell: (u) => naira(u.walletBalance) },
       { label: "Joined", cell: (u) => date(u.joinedAt) },
       { label: "", right: true, cell: (u) => h("div", { class: "row", style: { justifyContent: "flex-end" } },

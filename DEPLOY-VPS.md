@@ -114,7 +114,7 @@ MONNIFY_API_KEY=…             (Monnify dashboard → Developers; see MONNIFY.m
 MONNIFY_SECRET_KEY=…
 MONNIFY_CONTRACT_CODE=…
 MONNIFY_WALLET_ACCOUNT=…      (your Monnify wallet account number, for driver payouts)
-MAP_TILES_URL=https://tiles.caliphaterides.com.ng/sokoto
+MAP_TILES_URL=https://tiles.caliphaterides.com.ng/caliphate
 MAP_GLYPHS_URL=https://tiles.caliphaterides.com.ng/font/{fontstack}/{range}
 ```
 

@@ -114,7 +114,7 @@ const driverFields = {
   user: driverUser._id,
   status: "approved",
   vehicleType: "keke",
-  personal: { fullName: DRIVER.name, dateOfBirth: "1988-05-10", gender: "male", address: "14 Sultan Bello Road, Sokoto", lga: "Sokoto North", nin: "12345678901", email: DRIVER.email },
+  personal: { fullName: DRIVER.name, dateOfBirth: "1988-05-10", gender: "male", address: "14 Sultan Bello Road, Sokoto", state: "Sokoto", lga: "Sokoto North", nin: "12345678901", email: DRIVER.email },
   vehicle: { make: "Bajaj", model: "RE", year: "2021", colour: "Yellow", plate: "SKT 482 KK", ownsVehicle: false },
   guarantor: { fullName: "Alhaji Musa Sani", phone: "+2348039876543", relationship: "Parent", address: "Mabera, Sokoto" },
   owner: { fullName: "Alhaji Umar Bello", phone: "+2348035551234", email: "umar.bello@example.com", address: "7 Gidan Dare Road, Sokoto" },

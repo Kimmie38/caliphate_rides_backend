@@ -12,6 +12,7 @@ import { driversRouter } from "./routes/drivers.js";
 import { driverTripsRouter } from "./routes/driverTrips.js";
 import { filesRouter } from "./routes/files.js";
 import { meRouter } from "./routes/me.js";
+import { whatsappRouter } from "./routes/whatsapp.js";
 import { paymentsRouter } from "./routes/payments.js";
 import { publicRouter } from "./routes/public.js";
 import { ridesRouter } from "./routes/rides.js";
@@ -32,8 +33,9 @@ export function createApp() {
   app.use(securityHeaders);
   app.use(cors);
 
-  // Payment webhooks read the raw body, so this goes before express.json().
+  // Payment and WhatsApp webhooks read the raw body (to check signatures), so these go before express.json().
   app.use("/payments", paymentsRouter);
+  app.use("/whatsapp", whatsappRouter);
 
   app.use(express.json({ limit: "200kb" }));
 

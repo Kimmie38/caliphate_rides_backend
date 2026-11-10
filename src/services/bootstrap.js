@@ -10,10 +10,11 @@ import { LANDMARKS } from "../data/landmarks.js";
 import { log } from "../lib/log.js";
 import { hashPassword } from "../lib/password.js";
 import { DEFAULT_PRICING } from "../lib/pricing.js";
-import { Admin, Config, Place } from "../models/index.js";
+import { Admin, Config, Place, User } from "../models/index.js";
 
 export async function ensureDefaults({ say = (m) => log.info(m) } = {}) {
   await Promise.all([Admin.init(), Config.init(), Place.init()]); // build indexes
+  await migrateUserIndexes(say);
 
   if (await Config.exists({ _id: "pricing" })) {
     say("Fares: already set, left as they are.");
@@ -47,4 +48,20 @@ export async function ensureDefaults({ say = (m) => log.info(m) } = {}) {
     await Admin.create({ email, name, passwordHash: await hashPassword(password), role: "owner" });
     say(`Admin: created ${email} (owner). You can now remove ADMIN_PASSWORD from the settings.`);
   }
+}
+
+/**
+ * Phone numbers used to be required and unique on every account. Accounts made by email have none
+ * until they add one, so the old "unique phone" index is swapped for one that only applies when a
+ * phone is set. Safe to run on every start.
+ */
+async function migrateUserIndexes(say) {
+  const users = User.collection;
+  const indexes = await users.indexes().catch(() => []);
+  const old = indexes.find((i) => i.name === "phone_1");
+  if (old) {
+    await users.dropIndex("phone_1");
+    say("Users: phone index updated so accounts made by email can add their phone later.");
+  }
+  await User.init(); // creates phone_unique_when_set and signInEmail_unique_when_set
 }

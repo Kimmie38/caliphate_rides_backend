@@ -19,6 +19,12 @@ export async function requireUser(req, _res, next) {
   next();
 }
 
+/** Booking and driving need a confirmed phone number: riders and drivers call each other at pickup. */
+export function requirePhone(req, _res, next) {
+  if (!req.user?.phone) throw forbidden("Add your phone number first (Account → Profile).", "phone_needed");
+  next();
+}
+
 /** The signed-in person's driver record (any status). Sets req.driver. Use after requireUser. */
 export async function requireDriver(req, _res, next) {
   const driver = await Driver.findOne({ user: req.user._id });

@@ -100,7 +100,7 @@ async function renderDriver(main, id) {
 
       h("div", { class: "grid two" },
         h("section", { class: "card", style: { display: "grid", gap: 12 } }, h("h2", {}, "Personal"),
-          kv([["Full name", p.fullName], ["Date of birth", p.dateOfBirth], ["Gender", p.gender], ["NIN", p.nin], ["Address", p.address], ["LGA", p.lga], ["Email", p.email]])),
+          kv([["Full name", p.fullName], ["Date of birth", p.dateOfBirth], ["Gender", p.gender], ["NIN", p.nin], ["Address", p.address], ["State", p.state || (p.lga ? "Sokoto" : "")], ["LGA", p.lga], ["Email", p.email]])),
         h("section", { class: "card", style: { display: "grid", gap: 12 } }, h("h2", {}, "Vehicle"),
           kv([["Type", RIDE_TYPE_LABEL[d.vehicleType]], ["Make and model", [v.make, v.model].filter(Boolean).join(" ")], ["Year", v.year], ["Colour", v.colour], ["Plate", v.plate], ["Owner", v.ownsVehicle ? "The driver" : "Someone else (see Vehicle owner)"]])),
         !v.ownsVehicle ? h("section", { class: "card", style: { display: "grid", gap: 12, boxShadow: "inset 0 0 0 2px var(--violet-soft), var(--shadow)" } }, h("h2", {}, "Vehicle owner"),

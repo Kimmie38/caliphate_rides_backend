@@ -8,7 +8,7 @@ const plainMap = (m) => (m instanceof Map ? Object.fromEntries(m) : m ?? {});
 const round1 = (n) => Math.round((n ?? 0) * 10) / 10;
 
 export function userDTO(u) {
-  return { id: id(u), phone: u.phone, name: u.name ?? "", email: u.email ?? "", language: u.language === "ha" ? "ha" : "en", rating: round1(u.rating?.avg ?? 5), memberSince: u.createdAt };
+  return { id: id(u), phone: u.phone ?? "", name: u.name ?? "", email: u.email ?? "", signInEmail: u.signInEmail ?? "", language: u.language === "ha" ? "ha" : "en", rating: round1(u.rating?.avg ?? 5), memberSince: u.createdAt };
 }
 
 export function placeDTO(p) {
@@ -143,7 +143,7 @@ export function applicationDTO(d) {
     recordId: d.recordId ?? "",
     status: d.status,
     ...(d.vehicleType ? { vehicleType: d.vehicleType } : {}),
-    personal: { fullName: "", dateOfBirth: "", gender: "", address: "", lga: "", nin: "", email: "", ...pick(d.personal) },
+    personal: { fullName: "", dateOfBirth: "", gender: "", address: "", lga: "", nin: "", email: "", ...pick(d.personal), state: d.personal?.state || (d.personal?.lga ? "Sokoto" : "") },
     vehicle: { make: "", model: "", year: "", colour: "", plate: "", ownsVehicle: true, ...pick(d.vehicle) },
     guarantor: { fullName: "", phone: "", relationship: "", address: "", ...pick(d.guarantor) },
     owner: { fullName: "", phone: "", email: "", address: "", ...pick(d.owner) },

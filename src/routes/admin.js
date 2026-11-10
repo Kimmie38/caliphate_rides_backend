@@ -15,6 +15,7 @@
 //   GET  /admin/rides?status=                      GET /admin/riders?q=   POST /admin/riders/:id/block { blocked }
 //   GET/POST /admin/places   PUT/DELETE /admin/places/:id
 //   GET /admin/admins  POST /admin/admins { email, name, password }  POST /admin/admins/:id/active { active }  (owner only)
+import { CITIES, inAreas, cityList } from "../data/cities.js";
 import { randomUUID } from "node:crypto";
 import { Router } from "express";
 import { config } from "../config.js";
@@ -104,7 +105,8 @@ adminRouter.get("/me", (req, res) => res.json({ admin: adminDTO(req.admin) }));
 adminRouter.get("/settings", (_req, res) => {
   res.json({
     mapStyleUrl: config.admin.mapStyleUrl,
-    serviceArea: config.serviceArea,
+    serviceAreas: config.serviceAreas,
+    cities: CITIES.map((c) => ({ id: c.id, name: c.name, state: c.state, center: c.center, box: c.box })),
     placeCategories: PLACE_CATEGORIES,
     limits: LIMITS,
     paymentsReady: paymentsReady(),
@@ -487,10 +489,10 @@ adminRouter.get("/rides", async (req, res) => {
 
 adminRouter.get("/riders", async (req, res) => {
   const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
-  const filter = q ? { $or: [{ name: new RegExp(escapeRegex(q), "i") }, { phone: new RegExp(escapeRegex(q.replace(/\s/g, ""))) }] } : {};
+  const filter = q ? { $or: [{ name: new RegExp(escapeRegex(q), "i") }, { phone: new RegExp(escapeRegex(q.replace(/\s/g, ""))) }, { signInEmail: new RegExp(escapeRegex(q.trim()), "i") }] } : {};
   const users = await User.find(filter).sort({ createdAt: -1 }).limit(200);
   res.json({
-    riders: users.map((u) => ({ id: u._id.toString(), name: u.name, phone: u.phone, walletBalance: u.walletBalance, blocked: u.blocked, joinedAt: u.createdAt.toISOString() })),
+    riders: users.map((u) => ({ id: u._id.toString(), name: u.name, phone: u.phone ?? "", email: u.signInEmail || u.email || "", walletBalance: u.walletBalance, blocked: u.blocked, joinedAt: u.createdAt.toISOString() })),
   });
 });
 
@@ -523,9 +525,8 @@ adminRouter.get("/places", async (req, res) => {
 function placeInput(body) {
   const b = obj(body);
   const at = point({ name: b.name, latitude: b.latitude, longitude: b.longitude }, "Place");
-  const a = config.serviceArea;
-  if (a && !(at.latitude >= a.south - 0.2 && at.latitude <= a.north + 0.2 && at.longitude >= a.west - 0.2 && at.longitude <= a.east + 0.2)) {
-    throw badRequest("That pin is far outside Sokoto. Move it onto the map of the city.", "outside_service_area");
+  if (!inAreas(at, config.serviceAreas, 0.2)) {
+    throw badRequest(`That pin is far from ${cityList(config.serviceAreas ?? undefined)}. Move it onto the map of one of those cities.`, "outside_service_area");
   }
   return {
     name: text(b.name, "Name", { min: 2, max: 80 }),

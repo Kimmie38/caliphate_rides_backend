@@ -48,6 +48,7 @@ const DriverSchema = new mongoose.Schema(
       dateOfBirth: { type: String, default: "" },
       gender: { type: String, enum: ["", "male", "female"], default: "" },
       address: { type: String, default: "" },
+      state: { type: String, default: "" }, // Sokoto, Kano, Kaduna, FCT (Abuja) or Plateau
       lga: { type: String, default: "" },
       nin: { type: String, default: "" },
       email: { type: String, default: "" },

@@ -92,7 +92,7 @@ export function validWebhookHash(header) {
 }
 
 /** Flutterwave needs an email; riders sign in by phone, so use a stable placeholder when they have none. */
-export const paymentEmail = (user) => user.email || `${user.phone.replace(/\D/g, "")}@${config.flutterwave.emailDomain}`;
+export const paymentEmail = (user) => user.email || user.signInEmail || `${(user.phone ?? "").replace(/\D/g, "") || user._id}@${config.flutterwave.emailDomain}`;
 
 // ---------- bank accounts ----------
 

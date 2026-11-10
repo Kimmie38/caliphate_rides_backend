@@ -6,7 +6,7 @@
 import { Router } from "express";
 import { badRequest, conflict } from "../lib/errors.js";
 import {
-  BANKS, DOCUMENT_KINDS, RELATIONSHIPS, SOKOTO_LGAS, documentRequirement, isIsoDate,
+  BANKS, DOCUMENT_KINDS, RELATIONSHIPS, STATES, STATE_LGAS, documentRequirement, isIsoDate,
   missingSections, normalizePlate, validateDocumentDetails,
 } from "../lib/driverRules.js";
 import { applicationDTO } from "../lib/serialize.js";
@@ -14,7 +14,7 @@ import { discardUploads, storeUploads } from "../lib/storage.js";
 import { log } from "../lib/log.js";
 import { verifyDriverBank } from "../services/driverMoney.js";
 import { obj } from "../lib/validate.js";
-import { requireUser } from "../middleware/auth.js";
+import { requirePhone, requireUser } from "../middleware/auth.js";
 import { documentUpload } from "../middleware/upload.js";
 import { Driver, nextSeq } from "../models/index.js";
 
@@ -64,12 +64,15 @@ driversRouter.put("/me/application", async (req, res) => {
   if (body.vehicleType !== undefined) driver.vehicleType = choice(body.vehicleType, ["keke", "car"]) || undefined;
   if (body.personal) {
     const p = obj(body.personal, "Personal details");
+    // Older app versions send only a Sokoto LGA, with no state.
+    const state = choice(p.state, STATES) || (STATE_LGAS.Sokoto.includes(p.lga) ? "Sokoto" : "");
     driver.personal = {
+      state,
       fullName: s(p.fullName, 80),
       dateOfBirth: isIsoDate(p.dateOfBirth) ? p.dateOfBirth : "",
       gender: choice(p.gender, ["male", "female"]),
       address: s(p.address, 240),
-      lga: choice(p.lga, SOKOTO_LGAS),
+      lga: state ? choice(p.lga, STATE_LGAS[state]) : "",
       nin: s(p.nin, 11).replace(/\D/g, ""),
       email: s(p.email, 120).toLowerCase(),
     };
@@ -144,7 +147,7 @@ driversRouter.post("/me/documents", documentUpload, async (req, res) => {
   }
 });
 
-driversRouter.post("/me/application/submit", async (req, res) => {
+driversRouter.post("/me/application/submit", requirePhone, async (req, res) => {
   const driver = await Driver.findOne({ user: req.user._id });
   if (!driver) throw badRequest("Fill in your application first.", "no_application");
   if (!EDITABLE.includes(driver.status)) throw conflict("Your application has already been sent.", "already_submitted");
