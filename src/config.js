@@ -73,11 +73,14 @@ export const config = {
     baseUrl: str("MONNIFY_BASE_URL").replace(/\/$/, ""),
   },
 
+  /** The app's link scheme (app.config.ts "scheme"): payment pages send people back with caliphaterides://payment?status=… */
+  appScheme: str("APP_SCHEME", "caliphaterides"),
+
   flutterwave: {
     secretKey: str("FLW_SECRET_KEY"),
     /** The "secret hash" you set under Settings → Webhooks; Flutterwave sends it back with each webhook. */
     webhookHash: str("FLW_WEBHOOK_HASH"),
-    emailDomain: str("PAYMENT_FALLBACK_EMAIL_DOMAIN", "riders.caliphaterides.ng"),
+    emailDomain: str("PAYMENT_FALLBACK_EMAIL_DOMAIN", "riders.caliphaterides.com.ng"),
     logoUrl: str("FLW_LOGO_URL"),
   },
 

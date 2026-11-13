@@ -7,6 +7,7 @@
 //   POST /payments/demo/pay  { ref, action: "pay" | "cancel" }
 // Everything is re-checked with the provider before applying anything.
 import { Router, raw, urlencoded } from "express";
+import { config } from "../config.js";
 import { markDemoPaid } from "../lib/demoPay.js";
 import { activeProvider } from "../lib/paymentProvider.js";
 import { Payment } from "../models/index.js";
@@ -48,17 +49,25 @@ paymentsRouter.post("/monnify/webhook", raw({ type: "*/*", limit: "1mb" }), asyn
   }
 });
 
-const page = (title, message) => `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+// back: the app link that closes the payment sheet and returns to the app. Opened in the app, the
+// sheet closes by itself as soon as the page loads; in a normal browser, the button opens the app.
+const page = (title, message, back) => `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${title}</title><style>body{font-family:system-ui,sans-serif;background:#F3F6F4;color:#0C1D15;display:grid;place-items:center;min-height:100vh;margin:0;padding:24px;text-align:center}
-.card{background:#fff;border-radius:22px;padding:32px 24px;max-width:360px;box-shadow:0 8px 30px rgba(12,29,21,.08)}h1{color:#00874F;font-size:22px;margin:0 0 8px}p{color:#5E7167;line-height:1.5;margin:0}</style></head>
-<body><div class="card"><h1>${title}</h1><p>${message}</p></div></body></html>`;
+.card{background:#fff;border-radius:22px;padding:32px 24px;max-width:360px;box-shadow:0 8px 30px rgba(12,29,21,.08)}h1{color:#00874F;font-size:22px;margin:0 0 8px}p{color:#5E7167;line-height:1.5;margin:0}
+a.back{display:block;margin-top:22px;background:#00874F;color:#fff;text-decoration:none;border-radius:16px;padding:15px;font-weight:700}</style></head>
+<body><div class="card"><h1>${title}</h1><p>${message}</p>${back ? `<a class="back" href="${back}">Back to Caliphate Rides</a>` : ""}</div>
+${back ? `<script>setTimeout(function(){location.href=${JSON.stringify(back)}},400)</script>` : ""}</body></html>`;
+
+/** The app link for a finished payment. The app only uses it to close the sheet: it re-checks with the server. */
+const backToApp = (status) => `${config.appScheme}://payment?status=${encodeURIComponent(status)}`;
 
 function resultPage(res, status) {
+  const back = backToApp(status);
   res.type("html").send(
-    status === "success" ? page("Payment received", "Thank you. You can go back to the Caliphate Rides app now.")
-    : status === "pending" ? page("Payment processing", "If you finished paying, it's being confirmed: go back to the app, it updates as soon as it's through. If you didn't, go back to the app to try again.")
-    : status === "cancelled" ? page("Payment cancelled", "Nothing was charged. Go back to the app to try again or choose another way to pay.")
-    : page("Payment not completed", "We couldn't confirm this payment. Go back to the app and try again, or choose another way to pay."),
+    status === "success" ? page("Payment received", "Thank you. You can go back to the Caliphate Rides app now.", back)
+    : status === "pending" ? page("Payment processing", "If you finished paying, it's being confirmed: go back to the app, it updates as soon as it's through. If you didn't, go back to the app to try again.", back)
+    : status === "cancelled" ? page("Payment cancelled", "Nothing was charged. Go back to the app to try again or choose another way to pay.", back)
+    : page("Payment not completed", "We couldn't confirm this payment. Go back to the app and try again, or choose another way to pay.", backToApp("failed")),
   );
 }
 

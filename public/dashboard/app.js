@@ -37,7 +37,7 @@ async function boot() {
 function showLogin() {
   clearInterval(countsTimer);
   if (cleanup) { cleanup(); cleanup = null; }
-  const email = h("input", { class: "input", type: "email", autocomplete: "username", required: true, placeholder: "you@caliphaterides.ng" });
+  const email = h("input", { class: "input", type: "email", autocomplete: "username", required: true, placeholder: "you@caliphaterides.com.ng" });
   const password = h("input", { class: "input", type: "password", autocomplete: "current-password", required: true });
   const error = h("div", { class: "notice red hidden", role: "alert" });
   const submit = h("button", { class: "btn", type: "submit" }, "Sign in");
