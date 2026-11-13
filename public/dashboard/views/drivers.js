@@ -103,11 +103,11 @@ async function renderDriver(main, id) {
 
       h("div", { class: "grid two" },
         h("section", { class: "card", style: { display: "grid", gap: 12 } }, h("h2", {}, "Personal"),
-          kv([["Full name", p.fullName], ["Date of birth", p.dateOfBirth], ["Gender", p.gender], ["NIN", p.nin], ["Address", p.address], ["State", p.state || (p.lga ? "Sokoto" : "")], ["LGA", p.lga], ["Email", p.email]])),
+          kv([["Full name", p.fullName], ["Date of birth", p.dateOfBirth], ["Gender", p.gender], ["NIN", p.nin], ["Address", p.address], ["State", p.state || (p.lga ? "Sokoto" : "")], ["LGA", p.lga]])),
         h("section", { class: "card", style: { display: "grid", gap: 12 } }, h("h2", {}, "Vehicle"),
           kv([["Type", RIDE_TYPE_LABEL[d.vehicleType]], ["Make and model", [v.make, v.model].filter(Boolean).join(" ")], ["Year", v.year], ["Colour", v.colour], ["Plate", v.plate], ["Owner", v.ownsVehicle ? "The driver" : "Someone else (see Vehicle owner)"]])),
         !v.ownsVehicle ? h("section", { class: "card", style: { display: "grid", gap: 12, boxShadow: "inset 0 0 0 2px var(--violet-soft), var(--shadow)" } }, h("h2", {}, "Vehicle owner"),
-          kv([["Name", d.owner?.fullName], ["Phone", d.owner?.phone], ["Email", d.owner?.email ? h("a", { href: `mailto:${d.owner.email}` }, d.owner.email) : ""], ["Address", d.owner?.address]]),
+          kv([["Name", d.owner?.fullName], ["Phone", d.owner?.phone], ["Address", d.owner?.address]]),
           h("p", { class: "muted small" }, "The owner's signed letter and government ID are under Documents.")) : null,
         h("section", { class: "card", style: { display: "grid", gap: 12 } }, h("h2", {}, "Guarantor"),
           kv([["Name", g.fullName], ["Phone", g.phone], ["Relationship", g.relationship], ["Address", g.address]])),

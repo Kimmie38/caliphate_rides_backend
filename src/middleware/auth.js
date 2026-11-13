@@ -24,7 +24,7 @@ export async function requireUser(req, _res, next) {
 
 /** Booking and driving need a confirmed phone number: riders and drivers call each other at pickup. */
 export function requirePhone(req, _res, next) {
-  if (!req.user?.phone) throw forbidden("Add your phone number first (Account → Profile).", "phone_needed");
+  if (!req.user?.phone) throw forbidden("Sign in again with your phone number.", "phone_needed");
   next();
 }
 

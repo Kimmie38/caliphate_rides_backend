@@ -11,7 +11,7 @@ export async function render(main) {
     const { riders } = await api(`/riders${q ? `?q=${encodeURIComponent(q)}` : ""}`);
     clear(results, table([
       { label: "Rider", cell: (u) => h("b", {}, u.name || "No name yet") },
-      { label: "Phone or email", cell: (u) => u.phone ? h("div", {}, u.phone, ["sms", "whatsapp", "support"].includes(u.phoneCheckedBy) ? null : h("div", { class: "muted small" }, "not confirmed")) : u.email || "–" },
+      { label: "Phone", cell: (u) => u.phone ? h("div", {}, u.phone, ["sms", "whatsapp", "support"].includes(u.phoneCheckedBy) ? null : h("div", { class: "muted small" }, "not confirmed")) : "–" },
       { label: "Wallet", right: true, num: true, cell: (u) => naira(u.walletBalance) },
       { label: "Joined", cell: (u) => date(u.joinedAt) },
       { label: "", right: true, cell: (u) => h("div", { class: "row", style: { justifyContent: "flex-end" } },

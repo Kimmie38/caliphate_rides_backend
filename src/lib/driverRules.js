@@ -119,7 +119,6 @@ export function validatePersonal(p) {
   if (!p.state) e.state = "Choose your state.";
   if (!p.lga) e.lga = "Choose your local government area.";
   if (!/^\d{11}$/.test(p.nin ?? "")) e.nin = "Your NIN has 11 digits. Dial *346# to get it if you don't have your slip.";
-  if (p.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.email)) e.email = "Check the email address, or leave it empty.";
   return e;
 }
 
@@ -159,7 +158,6 @@ export function validateOwner(o, driverPhone) {
   const ph = normalizeNgPhone(o.phone ?? "");
   if (!ph) e.phone = "Enter the owner's Nigerian mobile number.";
   else if (driverPhone && ph === driverPhone) e.phone = "Enter the owner's own number, not yours.";
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((o.email ?? "").trim())) e.email = "Enter the owner's email address.";
   if ((o.address ?? "").trim().length < 8) e.address = "Enter the owner's house address.";
   return e;
 }
