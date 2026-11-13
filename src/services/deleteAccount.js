@@ -60,8 +60,8 @@ export async function deleteAccount(user) {
   await User.updateOne(
     { _id: user._id },
     {
-      $set: { name: "", email: "", devices: [], phoneCheckedBy: "", deletedAt: new Date(), lastSeenAt: new Date() },
-      $unset: { phone: 1, signInEmail: 1 },
+      $set: { name: "", email: "", devices: [], phoneCheckedBy: "", pinHash: "", pinFails: 0, pinLocked: false, deletedAt: new Date(), lastSeenAt: new Date() },
+      $unset: { phone: 1, signInEmail: 1, pinPausedUntil: 1, pinSetAt: 1 },
     },
   );
   log.info("account deleted", { user: user._id.toString(), driver: driver?._id?.toString() });

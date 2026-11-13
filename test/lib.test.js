@@ -273,3 +273,24 @@ test("a weaker phone check never replaces a stronger one", () => {
   assert.equal(strongerCheck("whatsapp", "support"), "whatsapp");
   assert.equal(strongerCheck(undefined, "demo"), "demo");
 });
+
+// ---- Sign-in PIN
+import { hashPin, pinMatches, pinProblem } from "../src/lib/pin.js";
+
+test("PIN: 4 digits, not easy to guess", () => {
+  assert.equal(pinProblem("4826"), null);
+  assert.match(pinProblem("123"), /4 digits/);
+  assert.match(pinProblem("12a4"), /4 digits/);
+  assert.match(pinProblem(1234), /4 digits/);
+  for (const weak of ["0000", "1111", "1234", "4321", "2580", "1212"]) assert.match(pinProblem(weak), /easy to guess/);
+});
+
+test("PIN: stored as a salted hash that only matches the right PIN", () => {
+  const a = hashPin("4826"), b = hashPin("4826");
+  assert.notEqual(a, b); // different salt each time
+  assert.ok(!a.includes("4826"));
+  assert.equal(pinMatches(a, "4826"), true);
+  assert.equal(pinMatches(a, "4827"), false);
+  assert.equal(pinMatches("", "4826"), false);
+  assert.equal(pinMatches("garbage", "4826"), false);
+});

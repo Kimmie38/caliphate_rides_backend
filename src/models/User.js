@@ -24,7 +24,13 @@ const UserSchema = new mongoose.Schema(
      */
     phoneCheckedBy: { type: String, enum: ["", "sms", "whatsapp", "support", "app", "demo"], default: "" },
     // Phones this account has been used on (random IDs the app makes; newest last, at most 5).
-    devices: { type: [{ _id: false, id: String, lastSeenAt: Date }], default: [] },
+    devices: { type: [{ _id: false, id: String, name: String, lastSeenAt: Date }], default: [] },
+    // 4-digit sign-in PIN (scrypt hash, see src/lib/pin.js) and how many wrong tries in a row.
+    pinHash: { type: String, default: "" },
+    pinSetAt: Date,
+    pinFails: { type: Number, default: 0 },
+    pinPausedUntil: Date,
+    pinLocked: { type: Boolean, default: false }, // 10 wrong in a row: only "Forgot PIN" unlocks it
     lastSeenAt: Date,
     // Set when the person deletes their account in the app: contact details are removed, trips kept.
     deletedAt: Date,

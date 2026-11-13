@@ -7,6 +7,7 @@ const OtpCodeSchema = new mongoose.Schema(
     codeHash: { type: String, required: true },
     attempts: { type: Number, default: 0 },
     via: { type: String, enum: ["sms", "app", "support", "log", "fixed"], default: "sms" }, // how the person got the code
+    resetPin: { type: Boolean, default: false }, // asked with "Forgot PIN": signing in clears the old PIN
     expiresAt: { type: Date, required: true, expires: 0 }, // TTL index
   },
   { timestamps: { createdAt: true, updatedAt: false } },

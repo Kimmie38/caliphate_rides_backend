@@ -211,18 +211,21 @@ With `PAYMENT_PROVIDER=demo`, paying by card or topping up opens a page marked "
 
 **After the demo:** remove `DEMO_LOGINS`, set `PAYMENT_PROVIDER=monnify` (or flutterwave), redeploy, then `docker exec caliphate-api node scripts/demo-accounts.js --remove`. Anyone who knows a demo number and its code can sign in to it, so don't leave them on with real users.
 
-## Phone codes shown in the app (no SMS)
+## Signing in: code once, then a 4-digit PIN
 
-With `SMS_PROVIDER=app` in `.env`, the app shows the sign-in code as a notification on the phone that asked. It's free, and nothing to set up beyond that line.
+With `SMS_PROVIDER=app` in `.env`:
 
-- It checks the person is on a real phone with the app. It does **not** prove the SIM is theirs, so **call a driver's number before approving them** (the dashboard says "Phone not confirmed" until then).
-- A number that already has an account only gets its code shown on a phone it has used before. On a new phone (or after reinstalling the app) the app tells them to call support. Call their number back, then read them the code:
+- **New number:** the app shows a 6-digit code as a notification on that phone, then the person creates a 4-digit PIN.
+- **Signing in again** (after logging out, reinstalling the app, or on another phone): number + PIN. No code.
+- **Wrong PINs:** 5 in a row pause it for 30 minutes; 10 in a row lock it until they use **Forgot PIN**. On top of that, one network can make at most 30 sign-in attempts per 10 minutes.
+- **Forgot PIN:** on a phone they've used before, a code arrives as a notification and they create a new PIN. On a phone the account has never used, the app asks them to call support. Call their number back, check it's them, then read them the code:
 
 ```
 docker logs caliphate-api 2>&1 | grep "NEW phone" | tail -5
 ```
 
-- The old app (before this version) can't show codes: its codes still go to the log, as before.
+- The code checks that the person has a real phone with the app; it does not prove the SIM is theirs. **Call a driver's number before approving them** (the dashboard says "Phone not confirmed" until then).
+- Demo numbers in `DEMO_LOGINS` keep their fixed code and never need a PIN. The old app (before PINs) still gets codes, written to the log.
 
 ## Deleted accounts
 

@@ -8,6 +8,19 @@ import { User } from "../models/index.js";
 export const MAX_DEVICES = 5;
 const ID = /^[A-Za-z0-9_-]{16,64}$/;
 
+/** The phone's make and model the app sends (X-Device-Name), e.g. "Tecno Spark 10 Pro", or "". */
+export function deviceNameFrom(req) {
+  const v = req.headers["x-device-name"];
+  if (typeof v !== "string") return "";
+  return v.replace(/[^\p{L}\p{N} ()+.,'_-]/gu, "").replace(/\s+/g, " ").trim().slice(0, 60);
+}
+
+/** The name of the phone this account was used on most recently ("" if none is known). */
+export function lastDeviceName(user) {
+  const named = (user?.devices ?? []).filter((d) => d.name);
+  return named.length ? named[named.length - 1].name : "";
+}
+
 /** The phone's ID from the request, or "" if it didn't send a valid one. */
 export function deviceIdFrom(req) {
   const v = req.headers["x-device-id"];
@@ -22,12 +35,16 @@ export function knowsDevice(user, deviceId) {
 }
 
 /** Remembers that the account is used on this phone (keeps the newest MAX_DEVICES). */
-export async function rememberDevice(user, deviceId) {
+export async function rememberDevice(user, deviceId, name = "") {
   if (!deviceId || !user?._id) return;
-  if ((user.devices ?? []).some((d) => d.id === deviceId)) return; // already known: no write
+  const known = (user.devices ?? []).find((d) => d.id === deviceId);
+  if (known) {
+    if (name && !known.name) await User.updateOne({ _id: user._id, "devices.id": deviceId }, { $set: { "devices.$.name": name } });
+    return; // already known: no write
+  }
   await User.updateOne(
     { _id: user._id },
-    { $push: { devices: { $each: [{ id: deviceId, lastSeenAt: new Date() }], $slice: -MAX_DEVICES } } },
+    { $push: { devices: { $each: [{ id: deviceId, name, lastSeenAt: new Date() }], $slice: -MAX_DEVICES } } },
   );
 }
 

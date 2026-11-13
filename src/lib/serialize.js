@@ -1,5 +1,6 @@
 // Turns database records into exactly the shapes the app expects (see the app's src/types.ts and
 // src/driver/types.ts). Works with Mongoose documents or plain objects.
+import { needsPin } from "./pin.js";
 import { signedFileUrl } from "./files.js";
 
 const iso = (d) => (d ? new Date(d).toISOString() : undefined);
@@ -8,7 +9,12 @@ const plainMap = (m) => (m instanceof Map ? Object.fromEntries(m) : m ?? {});
 const round1 = (n) => Math.round((n ?? 0) * 10) / 10;
 
 export function userDTO(u) {
-  return { id: id(u), phone: u.phone ?? "", name: u.name ?? "", email: u.email ?? "", signInEmail: u.signInEmail ?? "", language: u.language === "ha" ? "ha" : "en", rating: round1(u.rating?.avg ?? 5), memberSince: u.createdAt };
+  return {
+    id: id(u), phone: u.phone ?? "", name: u.name ?? "", email: u.email ?? "",
+    language: u.language === "ha" ? "ha" : "en", rating: round1(u.rating?.avg ?? 5), memberSince: u.createdAt,
+    hasPin: !!u.pinHash,
+    needsPin: needsPin(u), // the app asks them to create one before going on
+  };
 }
 
 export function placeDTO(p) {
