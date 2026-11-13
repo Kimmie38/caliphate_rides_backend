@@ -9,5 +9,4 @@ export { Place, PLACE_CATEGORIES } from "./Place.js";
 export { Ride, RIDE_STATUSES, PAYMENT_METHODS } from "./Ride.js";
 export { User } from "./User.js";
 export { WalletTransaction } from "./WalletTransaction.js";
-export { WhatsAppCheck } from "./WhatsAppCheck.js";
 export { Withdrawal, WITHDRAWAL_STATUSES } from "./Withdrawal.js";

@@ -38,7 +38,7 @@ const DriverSchema = new mongoose.Schema(
     recordId: { type: String, unique: true, sparse: true }, // CR-DRV-2026-000123
     status: {
       type: String,
-      enum: ["draft", "submitted", "changes_requested", "approved", "rejected", "suspended"],
+      enum: ["draft", "submitted", "changes_requested", "approved", "rejected", "suspended", "deleted"],
       default: "draft",
       index: true,
     },

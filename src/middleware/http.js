@@ -8,7 +8,7 @@ export function cors(req, res, next) {
   if (origin && (any || config.corsOrigins.includes(origin))) {
     res.setHeader("Access-Control-Allow-Origin", any ? "*" : origin);
     res.setHeader("Vary", "Origin");
-    res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
+    res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Device-Id");
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
     res.setHeader("Access-Control-Max-Age", "600");
   }

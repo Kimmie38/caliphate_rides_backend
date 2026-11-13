@@ -28,6 +28,15 @@ export const config = {
   jwtDays: num("JWT_DAYS", 30),
 
   sms: {
+    /**
+     * How phone sign-in codes reach people:
+     *  - "app":     the app shows the code as a notification on the phone that asked (free; no SMS).
+     *               It checks the person is on a real phone with the app, NOT that they own the SIM.
+     *               A number that already has an account only gets its code on a phone it has used
+     *               before; a new phone needs support to read them the code (see src/lib/devices.js).
+     *  - "console": codes only go to the server log (testing).
+     *  - "termii":  real SMS through Termii (paid).
+     */
     provider: str("SMS_PROVIDER", "console"),
     /** Testing a deployed server without an SMS account: codes are written to the server log instead. */
     allowConsoleInProduction: str("ALLOW_CONSOLE_SMS") === "true",
@@ -37,28 +46,6 @@ export const config = {
     termiiChannel: str("TERMII_CHANNEL", "dnd"),
   },
   testLogin: { phone: str("TEST_PHONE"), code: str("TEST_CODE") },
-  /**
-   * Sign in with WhatsApp (free): the person sends a code from the app to our WhatsApp Business number,
-   * and Meta tells us through the webhook. We only receive messages, so nothing is charged.
-   * See WHATSAPP-EMAIL.md for setting it up.
-   */
-  whatsapp: {
-    number: str("WHATSAPP_NUMBER").replace(/\D/g, ""), // the business number people message, e.g. 2348012345678
-    phoneNumberId: str("WHATSAPP_PHONE_NUMBER_ID"), // from Meta: only messages to this number count
-    appSecret: str("WHATSAPP_APP_SECRET"), // checks that webhook calls really come from Meta
-    verifyToken: str("WHATSAPP_VERIFY_TOKEN"), // any phrase you choose; typed into Meta's webhook setup too
-    accessToken: str("WHATSAPP_ACCESS_TOKEN"), // only needed if WHATSAPP_REPLY=true
-    reply: str("WHATSAPP_REPLY") === "true", // send "You're signed in" back (Meta may charge for replies over its free monthly allowance)
-    graphVersion: str("WHATSAPP_GRAPH_VERSION", "v23.0"),
-  },
-  /** Sign in with an emailed code (free on Brevo's or Resend's free plan). */
-  email: {
-    provider: str("EMAIL_PROVIDER", "console"), // console (codes in the server log), brevo or resend
-    brevoKey: str("BREVO_API_KEY"),
-    resendKey: str("RESEND_API_KEY"),
-    from: str("EMAIL_FROM", "no-reply@caliphaterides.com.ng"),
-    fromName: str("EMAIL_FROM_NAME", "Caliphate Rides"),
-  },
   /**
    * Fixed sign-in codes for demo accounts, so a presentation doesn't depend on SMS:
    * DEMO_LOGINS=08000000001:123456,08000000002:123456  (phone:code, comma separated). Remove after the demo.
@@ -153,16 +140,9 @@ export function checkConfig() {
     else config.jwtSecret = "dev-only-secret-do-not-use-in-production";
   }
   if (isProd && config.jwtSecret.length < 32) problems.push("JWT_SECRET should be at least 32 characters.");
-  const wa = config.whatsapp;
-  if (wa.number && (!wa.appSecret || !wa.verifyToken)) problems.push("WHATSAPP_NUMBER is set, so WHATSAPP_APP_SECRET and WHATSAPP_VERIFY_TOKEN must be set too (see WHATSAPP-EMAIL.md).");
-  if (wa.reply && !wa.accessToken) problems.push("WHATSAPP_REPLY=true needs WHATSAPP_ACCESS_TOKEN.");
-  if (config.email.provider === "brevo" && !config.email.brevoKey) problems.push("EMAIL_PROVIDER=brevo needs BREVO_API_KEY.");
-  if (config.email.provider === "resend" && !config.email.resendKey) problems.push("EMAIL_PROVIDER=resend needs RESEND_API_KEY.");
-  if (!["console", "brevo", "resend"].includes(config.email.provider)) problems.push(`EMAIL_PROVIDER must be console, brevo or resend (it's "${config.email.provider}").`);
-  // With WhatsApp or email sign-in on, SMS can stay off: codes for the phone sign-in only go to the server log.
-  const otherSignIn = !!wa.number || config.email.provider !== "console";
-  if (isProd && config.sms.provider === "console" && !config.sms.allowConsoleInProduction && !otherSignIn) {
-    problems.push("SMS_PROVIDER is 'console': riders would never receive their sign-in codes. Set up Termii, or set ALLOW_CONSOLE_SMS=true while testing (codes then appear in the server log).");
+  if (!["console", "app", "termii"].includes(config.sms.provider)) problems.push(`SMS_PROVIDER must be app, console or termii (it's "${config.sms.provider}").`);
+  if (isProd && config.sms.provider === "console" && !config.sms.allowConsoleInProduction) {
+    problems.push("SMS_PROVIDER is 'console': riders would never receive their sign-in codes. Set SMS_PROVIDER=app (the app shows the code as a notification), or ALLOW_CONSOLE_SMS=true while testing.");
   }
   if (config.paymentProvider === "monnify" && config.monnify.apiKey && (!config.monnify.secretKey || !config.monnify.contractCode)) {
     problems.push("Monnify needs all three: MONNIFY_API_KEY, MONNIFY_SECRET_KEY and MONNIFY_CONTRACT_CODE (Monnify dashboard → Developers).");

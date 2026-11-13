@@ -1,6 +1,7 @@
 import { config } from "../config.js";
 import { forbidden, unauthorized } from "../lib/errors.js";
 import { verifyToken } from "../lib/jwt.js";
+import { deviceIdFrom, rememberDevice } from "../lib/devices.js";
 import { Admin, Driver, User } from "../models/index.js";
 
 const bearer = (req) => {
@@ -13,9 +14,11 @@ export async function requireUser(req, _res, next) {
   const payload = verifyToken(bearer(req), config.jwtSecret);
   if (!payload || payload.role !== "user") throw unauthorized();
   const user = await User.findById(payload.sub);
-  if (!user) throw unauthorized();
+  if (!user || user.deletedAt) throw unauthorized();
   if (user.blocked) throw forbidden("This account is on hold. Call Caliphate Rides support.", "account_blocked");
   req.user = user;
+  // Phones already signed in (before the app sent its ID) become this account's known phones.
+  await rememberDevice(user, deviceIdFrom(req)).catch(() => {});
   next();
 }
 
@@ -61,5 +64,5 @@ export async function userFromToken(token) {
   const payload = verifyToken(token, config.jwtSecret);
   if (!payload || payload.role !== "user") return null;
   const user = await User.findById(payload.sub);
-  return user && !user.blocked ? user : null;
+  return user && !user.blocked && !user.deletedAt ? user : null;
 }

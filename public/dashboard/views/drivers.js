@@ -88,7 +88,10 @@ async function renderDriver(main, id) {
       h("div", { class: "page-head" },
         h("div", {},
           h("div", { class: "row" }, h("h1", {}, p.fullName || "No name yet"), badge(d.status), d.online ? h("span", { class: "badge green" }, h("span", { class: "dot" }), "Online") : null),
-          h("p", {}, `${d.recordId} · ${d.phone} · ${RIDE_TYPE_LABEL[d.vehicleType] ?? "No vehicle type"} · ${d.trips} trips · ★ ${Number(d.rating).toFixed(1)}`)),
+          h("p", {}, `${d.recordId} · ${d.phone} · ${RIDE_TYPE_LABEL[d.vehicleType] ?? "No vehicle type"} · ${d.trips} trips · ★ ${Number(d.rating).toFixed(1)}`),
+          d.phone && !["sms", "whatsapp", "support"].includes(d.phoneCheckedBy)
+            ? h("p", { class: "muted small" }, "Phone not confirmed by SMS or a call yet: call this number before approving.")
+            : null),
         h("div", { class: "row" }, reviewButtons)),
       d.reviewNote ? h("div", { class: "notice", style: { marginBottom: 16 } }, `Note to driver: ${d.reviewNote}`) : null,
       d.missing?.length ? h("div", { class: "notice", style: { marginBottom: 16 } },

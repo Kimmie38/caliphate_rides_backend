@@ -3,11 +3,10 @@ import { RatingSchema } from "./shared.js";
 
 /**
  * Everyone who uses the app: riders, and drivers (who also have a Driver record).
- * People sign in with WhatsApp (their phone number), an email code, or an SMS code.
- *  - phone: confirmed by WhatsApp or SMS, +234XXXXXXXXXX. Someone who signed in by email adds it
- *    before booking or driving (drivers and riders call each other at pickup).
- *  - signInEmail: confirmed with an emailed code; can be used to sign in.
- *  - email: contact address shown in the profile (may be the same).
+ * People sign in with their phone number and a 6-digit code.
+ *  - phone: +234XXXXXXXXXX. phoneCheckedBy says how it was confirmed.
+ *  - email: optional contact address shown in the profile.
+ *  - signInEmail: from an earlier version that allowed signing in by email; no longer used.
  */
 const UserSchema = new mongoose.Schema(
   {
@@ -19,7 +18,16 @@ const UserSchema = new mongoose.Schema(
     language: { type: String, enum: ["en", "ha"], default: "en" }, // the app's language (English or Hausa)
     walletBalance: { type: Number, default: 0, min: 0 }, // naira
     blocked: { type: Boolean, default: false },
+    /**
+     * How the phone number was last confirmed. "sms", "support" (staff called the number) and "whatsapp" (earlier version)
+     * prove the person has the SIM; "app" only proves they typed it on a phone with the app.
+     */
+    phoneCheckedBy: { type: String, enum: ["", "sms", "whatsapp", "support", "app", "demo"], default: "" },
+    // Phones this account has been used on (random IDs the app makes; newest last, at most 5).
+    devices: { type: [{ _id: false, id: String, lastSeenAt: Date }], default: [] },
     lastSeenAt: Date,
+    // Set when the person deletes their account in the app: contact details are removed, trips kept.
+    deletedAt: Date,
   },
   { timestamps: true },
 );

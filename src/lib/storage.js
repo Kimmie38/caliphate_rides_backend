@@ -5,6 +5,7 @@
 // Uploads always land in UPLOAD_DIR first (multer); with mongo they're moved into the database.
 import { createReadStream } from "node:fs";
 import { unlink } from "node:fs/promises";
+import { basename, join } from "node:path";
 import { pipeline } from "node:stream/promises";
 import mongoose from "mongoose";
 import { config } from "../config.js";
@@ -47,4 +48,15 @@ export async function sendStored(name, res, next, missing) {
   res.setHeader("Content-Type", file.metadata?.contentType ?? TYPES[name.split(".").pop()] ?? "application/octet-stream");
   res.setHeader("Content-Length", String(file.length));
   await pipeline(b.openDownloadStream(file._id), res);
+}
+
+/** Permanently removes stored files by name (deleted accounts). Missing files are ignored. */
+export async function deleteStored(names) {
+  const list = [...new Set(names.filter(Boolean))];
+  if (!list.length) return;
+  await Promise.all(list.map((n) => unlink(join(config.uploadDir, basename(n))).catch(() => {})));
+  if (!useMongo()) return;
+  const b = bucket();
+  const stored = await b.find({ filename: { $in: list } }).toArray();
+  await Promise.all(stored.map((f) => b.delete(f._id).catch(() => {})));
 }

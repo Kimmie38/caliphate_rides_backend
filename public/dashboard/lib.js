@@ -133,7 +133,7 @@ export const ago = (iso) => {
 
 const STATUS = {
   draft: ["Draft", ""], submitted: ["Waiting for review", "amber"], changes_requested: ["Changes requested", "violet"],
-  approved: ["Approved", "green"], rejected: ["Rejected", "red"], suspended: ["On hold", "red"],
+  approved: ["Approved", "green"], rejected: ["Rejected", "red"], suspended: ["On hold", "red"], deleted: ["Deleted by driver", ""],
   searching: ["Finding driver", "amber"], accepted: ["Driver on the way", "blue"], arrived: ["Driver arrived", "blue"],
   in_progress: ["On trip", "blue"], completed: ["Completed", "green"], cancelled: ["Cancelled", ""], no_drivers: ["No drivers", "red"],
   processing: ["On its way", "amber"], successful: ["Paid out", "green"], failed: ["Failed", "red"], needs_check: ["Needs checking", "red"],

@@ -211,6 +211,23 @@ With `PAYMENT_PROVIDER=demo`, paying by card or topping up opens a page marked "
 
 **After the demo:** remove `DEMO_LOGINS`, set `PAYMENT_PROVIDER=monnify` (or flutterwave), redeploy, then `docker exec caliphate-api node scripts/demo-accounts.js --remove`. Anyone who knows a demo number and its code can sign in to it, so don't leave them on with real users.
 
+## Phone codes shown in the app (no SMS)
+
+With `SMS_PROVIDER=app` in `.env`, the app shows the sign-in code as a notification on the phone that asked. It's free, and nothing to set up beyond that line.
+
+- It checks the person is on a real phone with the app. It does **not** prove the SIM is theirs, so **call a driver's number before approving them** (the dashboard says "Phone not confirmed" until then).
+- A number that already has an account only gets its code shown on a phone it has used before. On a new phone (or after reinstalling the app) the app tells them to call support. Call their number back, then read them the code:
+
+```
+docker logs caliphate-api 2>&1 | grep "NEW phone" | tail -5
+```
+
+- The old app (before this version) can't show codes: its codes still go to the log, as before.
+
+## Deleted accounts
+
+Riders and drivers can delete their account in the app (Settings → Delete account), which Apple and Google require. Their name, phone, email, and for drivers their ID number, address, guarantor, bank details and document photos are removed for good. Trips, payments and payouts stay in the records as "Deleted account". The app refuses, with the reason, while a trip is running or a driver still has money to withdraw or commission to pay. Drivers show as "Deleted by driver" in the dashboard.
+
 ## Updating later
 
 After uploading new code to GitHub:

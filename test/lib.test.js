@@ -246,26 +246,30 @@ test("demo payments: payouts succeed at once and the bank name is echoed back", 
   assert.match(checkoutUrl, /\/payments\/demo\/checkout\?ref=CR-TOP-1$/);
 });
 
-test("WhatsApp: codes are found however they're typed, and webhook signatures are checked", async () => {
-  const wa = await import("../src/lib/whatsapp.js");
-  assert.deepEqual(wa.codesIn("Caliphate Rides code: K4M9Q2XT"), ["K4M9Q2XT"]);
-  assert.deepEqual(wa.codesIn("k4m9-q2xt thank you"), ["K4M9Q2XT"]);
-  assert.deepEqual(wa.codesIn("hello there"), []);
-  assert.match(wa.newCheckCode(), /^[2-9A-HJKMNP-Z]{8}$/);
-  const { config } = await import("../src/config.js");
-  config.whatsapp.appSecret = "s3cret";
-  const { createHmac } = await import("node:crypto");
-  const body = Buffer.from('{"entry":[]}');
-  assert.equal(wa.validSignature(body, "sha256=" + createHmac("sha256", "s3cret").update(body).digest("hex")), true);
-  assert.equal(wa.validSignature(body, "sha256=" + createHmac("sha256", "other").update(body).digest("hex")), false);
-  assert.equal(wa.validSignature(body, undefined), false);
-  const msgs = wa.messagesIn({ entry: [{ changes: [{ value: { messages: [{ from: "2348031234567", type: "text", text: { body: "hi" } }] } }] }] });
-  assert.equal(msgs[0].from, "+2348031234567");
+
+// ---- Phones an account has used (SMS_PROVIDER=app)
+import { deviceIdFrom, knowsDevice, strongerCheck } from "../src/lib/devices.js";
+
+test("device IDs: only well-formed ones are read", () => {
+  assert.equal(deviceIdFrom({ headers: { "x-device-id": "abcDEF123_-abcdefgh" } }), "abcDEF123_-abcdefgh");
+  assert.equal(deviceIdFrom({ headers: { "x-device-id": "short" } }), "");
+  assert.equal(deviceIdFrom({ headers: { "x-device-id": "has spaces in it, not allowed!!" } }), "");
+  assert.equal(deviceIdFrom({ headers: {} }), "");
 });
 
-test("email sign-in code email is in the chosen language", async () => {
-  const { codeEmail } = await import("../src/lib/email.js");
-  assert.match(codeEmail("123456", "en").subject, /Your Caliphate Rides code: 123456/);
-  assert.match(codeEmail("123456", "ha").subject, /Lambar shigarka/);
-  assert.match(codeEmail("123456").html, /123456/);
+test("in-app codes: new numbers and known phones only", () => {
+  assert.equal(knowsDevice(null, ""), true); // brand-new number
+  assert.equal(knowsDevice({ devices: [] }, "x".repeat(20)), true); // account that never recorded a phone
+  const user = { devices: [{ id: "a".repeat(20) }] };
+  assert.equal(knowsDevice(user, "a".repeat(20)), true);
+  assert.equal(knowsDevice(user, "b".repeat(20)), false); // someone else's phone
+  assert.equal(knowsDevice(user, ""), false);
+});
+
+test("a weaker phone check never replaces a stronger one", () => {
+  assert.equal(strongerCheck("", "app"), "app");
+  assert.equal(strongerCheck("app", "sms"), "sms");
+  assert.equal(strongerCheck("sms", "app"), "sms");
+  assert.equal(strongerCheck("whatsapp", "support"), "whatsapp");
+  assert.equal(strongerCheck(undefined, "demo"), "demo");
 });

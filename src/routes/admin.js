@@ -214,7 +214,7 @@ adminRouter.put("/config/pricing", async (req, res) => {
 
 adminRouter.get("/drivers", async (req, res) => {
   const filter = {};
-  if (req.query.status) filter.status = oneOf(req.query.status, "Status", ["draft", "submitted", "changes_requested", "approved", "rejected", "suspended"]);
+  if (req.query.status) filter.status = oneOf(req.query.status, "Status", ["draft", "submitted", "changes_requested", "approved", "rejected", "suspended", "deleted"]);
   if (req.query.owing === "1") filter.balance = { $lt: 0 };
   const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
   if (q) {
@@ -244,7 +244,7 @@ adminRouter.get("/drivers", async (req, res) => {
 });
 
 async function loadDriver(id) {
-  const d = await Driver.findById(id).populate("user", "phone name");
+  const d = await Driver.findById(id).populate("user", "phone name phoneCheckedBy");
   if (!d) throw notFound("Driver not found.");
   return d;
 }
@@ -259,6 +259,7 @@ async function fullDriver(d) {
   return {
     id: d._id.toString(),
     phone: d.user?.phone ?? "",
+    phoneCheckedBy: d.user?.phoneCheckedBy ?? "",
     rating: d.rating?.avg ?? 5,
     trips: d.tripsCount ?? 0,
     online: d.online,
@@ -492,7 +493,7 @@ adminRouter.get("/riders", async (req, res) => {
   const filter = q ? { $or: [{ name: new RegExp(escapeRegex(q), "i") }, { phone: new RegExp(escapeRegex(q.replace(/\s/g, ""))) }, { signInEmail: new RegExp(escapeRegex(q.trim()), "i") }] } : {};
   const users = await User.find(filter).sort({ createdAt: -1 }).limit(200);
   res.json({
-    riders: users.map((u) => ({ id: u._id.toString(), name: u.name, phone: u.phone ?? "", email: u.signInEmail || u.email || "", walletBalance: u.walletBalance, blocked: u.blocked, joinedAt: u.createdAt.toISOString() })),
+    riders: users.map((u) => ({ id: u._id.toString(), name: u.deletedAt ? "Deleted account" : u.name, deleted: !!u.deletedAt, phone: u.phone ?? "", email: u.signInEmail || u.email || "", phoneCheckedBy: u.phoneCheckedBy ?? "", walletBalance: u.walletBalance, blocked: u.blocked, joinedAt: u.createdAt.toISOString() })),
   });
 });
 
