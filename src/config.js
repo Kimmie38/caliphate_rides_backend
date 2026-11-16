@@ -82,6 +82,13 @@ export const config = {
     webhookHash: str("FLW_WEBHOOK_HASH"),
     emailDomain: str("PAYMENT_FALLBACK_EMAIL_DOMAIN", "riders.caliphaterides.com.ng"),
     logoUrl: str("FLW_LOGO_URL"),
+    /**
+     * Ways to pay shown on Flutterwave's page (card, bank transfer and USSD by default: no PayPal or
+     * foreign wallets). Flutterwave only follows this when "Enable Dashboard Payment Options" is
+     * unticked in its dashboard (Settings → Account settings). Valid for naira: card, banktransfer,
+     * ussd, account, internetbanking, nqr, applepay, googlepay, enaira, opay.
+     */
+    paymentOptions: str("FLW_PAYMENT_OPTIONS", "card, banktransfer, ussd"),
   },
 
   routingUrl: str("ROUTING_URL", "https://router.project-osrm.org").replace(/\/$/, ""),

@@ -56,6 +56,7 @@ export async function createCheckout({ reference, amountNaira, customer, title, 
       tx_ref: reference,
       amount: amountNaira,
       currency: "NGN",
+      payment_options: config.flutterwave.paymentOptions, // card, bank transfer, USSD: no PayPal
       redirect_url: `${config.publicUrl}/payments/flutterwave/return`,
       customer: { email: customer.email, name: customer.name || undefined, phonenumber: customer.phone || undefined },
       customizations: { title: title ?? "Caliphate Rides", description, ...(config.flutterwave.logoUrl ? { logo: config.flutterwave.logoUrl } : {}) },

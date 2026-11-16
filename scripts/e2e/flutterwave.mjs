@@ -72,9 +72,9 @@ await User.updateOne({ phone: "+2348000000001" }, { name: "Aisha Bello" });
 let r = await call("POST", "/wallet/topup", { amount: 5000 }, { token });
 assert.equal(r.status, 200); assert.match(r.body.checkoutUrl, /^https:\/\/checkout\.flutterwave\.com\//);
 const c = fw.checkouts.at(-1);
-assert.equal(c.amount, 5000); assert.equal(c.currency, "NGN"); assert.equal(c.redirect_url, "https://api.caliphaterides.com.ng/payments/flutterwave/return");
+assert.equal(c.amount, 5000); assert.equal(c.currency, "NGN"); assert.equal(c.payment_options, "card, banktransfer, ussd"); assert.equal(c.redirect_url, "https://api.caliphaterides.com.ng/payments/flutterwave/return");
 assert.ok(c.customer.email.includes("@")); assert.equal(c.customer.name, "Aisha Bello");
-const ref = c.tx_ref; ok(`top-up ₦5,000: Flutterwave page made (${c.customer.email} for the receipt)`);
+const ref = c.tx_ref; ok(`top-up ₦5,000: Flutterwave page offers card, bank transfer and USSD only (no PayPal)`);
 
 // 2. A fake webhook (wrong secret hash) is refused
 r = await webhook("charge.completed", { id: 111, tx_ref: ref, status: "successful", amount: 5000 }, "wrong-hash");
